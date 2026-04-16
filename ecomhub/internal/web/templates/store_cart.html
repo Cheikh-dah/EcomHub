@@ -1,0 +1,49 @@
+{{define "store_cart"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cart · {{.Store.Name}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <h1>Cart — {{.Store.Name}}</h1>
+  {{if .Err}}<p class="error">{{.Err}}</p>{{end}}
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  {{if .Thanks}}<p class="success">Order placed (mock payment). Thank you!</p>{{end}}
+  {{if .Lines}}
+  <table class="table">
+    <thead><tr><th>Product</th><th>Qty</th><th>Line</th><th></th></tr></thead>
+    <tbody>
+      {{range .Lines}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{.Quantity}}</td>
+        <td>${{printf "%.2f" .LineTotal}}</td>
+        <td>
+          <form method="post" action="/s/{{$.Store.Subdomain}}/cart/remove" style="display:inline">
+            <input type="hidden" name="product_id" value="{{.ProductID}}">
+            <button type="submit" class="linkish">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <p class="total"><strong>Total: ${{printf "%.2f" .Total}}</strong></p>
+  <form method="post" action="/s/{{.Store.Subdomain}}/checkout">
+    <button type="submit">Checkout (mock payment)</button>
+  </form>
+  <p class="muted">Checkout requires a logged-in account. <a href="/dashboard">Sign in from the dashboard</a>.</p>
+  {{else}}
+  <p>Your cart is empty.</p>
+  {{end}}
+  <p><a href="/s/{{.Store.Subdomain}}">Continue shopping</a></p>
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

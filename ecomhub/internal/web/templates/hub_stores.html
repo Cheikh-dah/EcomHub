@@ -1,0 +1,28 @@
+{{define "hub_stores"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stores · EcomHub</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <h1>Stores on EcomHub</h1>
+  <ul class="grid">
+    {{range .Stores}}
+    <li class="card">
+      <a href="/s/{{.Subdomain}}">{{.Name}}</a>
+      <p class="muted">{{.Subdomain}}</p>
+    </li>
+    {{else}}
+    <p>No stores yet.</p>
+    {{end}}
+  </ul>
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

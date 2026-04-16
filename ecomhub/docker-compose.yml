@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ecomhub
+      POSTGRES_PASSWORD: ecomhub
+      POSTGRES_DB: ecomhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - ecomhub_pg:/var/lib/postgresql/data
+
+volumes:
+  ecomhub_pg:

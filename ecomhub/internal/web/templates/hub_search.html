@@ -1,0 +1,45 @@
+{{define "hub_search"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Search · EcomHub</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <h1>Search</h1>
+  <form class="search-form" method="get" action="/search">
+    <input type="search" name="q" value="{{.Query}}" placeholder="Products or stores…" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+  {{if .Query}}
+  <h2>Products</h2>
+  <ul class="grid">
+    {{range .Products}}
+    <li class="card">
+      <a href="/s/{{.Subdomain}}/products/{{.ID}}">{{.Name}}</a>
+      <p class="muted">{{.StoreName}} · ${{printf "%.2f" .Price}}</p>
+    </li>
+    {{else}}
+    <p class="muted">No matching products.</p>
+    {{end}}
+  </ul>
+  <h2>Stores</h2>
+  <ul class="grid">
+    {{range .Stores}}
+    <li class="card">
+      <a href="/s/{{.Subdomain}}">{{.Name}}</a>
+    </li>
+    {{else}}
+    <p class="muted">No matching stores.</p>
+    {{end}}
+  </ul>
+  {{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

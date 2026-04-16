@@ -1,0 +1,63 @@
+{{define "dashboard"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · EcomHub</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <h1>Merchant dashboard</h1>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  {{if .Token}}
+  <p class="success">You are signed in. Use the API with <code>Authorization: Bearer &lt;token&gt;</code> or stay in this browser session (cookie).</p>
+  <section>
+    <h2>Your stores</h2>
+    <ul>
+      {{range .Stores}}
+      <li><strong>{{.Name}}</strong> — <code>{{.Subdomain}}</code> · <a href="/s/{{.Subdomain}}">storefront</a></li>
+      {{else}}
+      <li class="muted">No stores yet. Create one via the API (<code>POST /api/stores</code>) or the form below.</li>
+      {{end}}
+    </ul>
+    <h3>Create store</h3>
+    <form method="post" action="/dashboard/stores" class="stack-form">
+      <label>Name <input name="name" required></label>
+      <label>Subdomain <input name="subdomain" pattern="[a-z0-9][a-z0-9-]{1,62}[a-z0-9]" required placeholder="my-shop"></label>
+      <label>Description <textarea name="description"></textarea></label>
+      <button type="submit">Create store</button>
+    </form>
+  </section>
+  {{else}}
+  <section class="auth-panel">
+    <h2>Register</h2>
+    <form method="post" action="/dashboard/register" class="stack-form">
+      <label>Email <input type="email" name="email" required></label>
+      <label>Password <input type="password" name="password" required minlength="8"></label>
+      <button type="submit">Create account</button>
+    </form>
+    <h2>Sign in</h2>
+    <form method="post" action="/dashboard/login" class="stack-form">
+      <label>Email <input type="email" name="email" required></label>
+      <label>Password <input type="password" name="password" required></label>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+  {{end}}
+  <section>
+    <h2>API quick reference</h2>
+    <ul class="muted">
+      <li><code>POST /api/register</code>, <code>POST /api/login</code></li>
+      <li><code>POST /api/stores</code>, <code>GET /api/stores</code></li>
+      <li><code>POST /api/products</code> (JSON body includes <code>store_id</code>)</li>
+      <li><code>GET /api/cart</code>, <code>POST /api/cart/add</code>, <code>POST /api/orders</code></li>
+    </ul>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}
