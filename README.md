@@ -1,33 +1,21 @@
 # EcomHub
 
-EcomHub is an MVP e-commerce platform for creating simple online stores and sharing public storefront links.
+MVP platform: sellers create stores and share public storefronts; buyers browse on **subdomains** (`https://{store}.ecomhub.com`) while dashboard and hub stay on the apex domain.
 
-## MVP Stack
-- Backend: Go + Gin
-- Database: PostgreSQL (`pgxpool`)
-- Auth: Supabase Auth + internal user mapping
-- UI (MVP): server-rendered pages from the Go app
-- Local development: Docker Compose + local Go server
+## Documentation
 
-## Repository Structure
-- `PRD.md` - Product requirements for MVP scope
-- `MVP-ROADMAP.md` - phased implementation roadmap
-- `STACK.md` - locked MVP technology choices
-- `ecomhub/` - application source code
-- `Get idea/` - exploratory/legacy notes and prototypes
+All product, stack, routing, schema, env, roadmap, and acceptance criteria live in **[ECOMHUB.md](./ECOMHUB.md)**.
 
-## Local Setup (MVP)
-1. Start PostgreSQL:
-   - `docker compose -f ecomhub/docker-compose.yml up -d`
-2. Configure environment:
-   - copy `ecomhub/.env.example` to `ecomhub/.env`
-   - set required values (`DATABASE_URL`, Supabase variables, etc.)
-3. Run the backend:
-   - from `ecomhub/`: `go run ./cmd/server`
+## Quick start
 
-## Current Status
-- Core MVP docs are aligned and committed:
-  - `PRD.md`
-  - `MVP-ROADMAP.md`
-  - `STACK.md`
-- Next step is implementing the managed-auth flow and MVP hardening in `ecomhub/`.
+1. Postgres: `docker compose -f ecomhub/docker-compose.yml up -d`  
+2. Env: copy `ecomhub/.env.example` → `ecomhub/.env` and fill values (see `ECOMHUB.md` §7).  
+3. Run: from `ecomhub/`, `go run ./cmd/server`
+
+## Repo layout
+
+| Path | Purpose |
+|------|---------|
+| `ECOMHUB.md` | Full MVP reference |
+| `ecomhub/` | Application source |
+| `Get idea/` | Exploratory / legacy notes |
