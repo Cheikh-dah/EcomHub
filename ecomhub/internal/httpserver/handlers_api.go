@@ -130,10 +130,20 @@ func (s *Server) apiLogout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// apiMe returns the internal user id after Supabase (sub → user_identities) or legacy JWT resolution.
+func (s *Server) apiMe(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user_id": uid.String()})
+}
+
 func (s *Server) apiListStores(c *gin.Context) {
 	uid, _ := middleware.UserID(c)
 	rows, err := s.pool.Query(c.Request.Context(),
-		`SELECT id, user_id, name, subdomain, description, created_at FROM stores WHERE user_id = $1 ORDER BY id`,
+		`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE user_id = $1 ORDER BY id`,
 		uid,
 	)
 	if err != nil {
@@ -144,7 +154,7 @@ func (s *Server) apiListStores(c *gin.Context) {
 	var out []models.Store
 	for rows.Next() {
 		var st models.Store
-		if err := rows.Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.CreatedAt); err != nil {
+		if err := rows.Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan failed"})
 			return
 		}
@@ -524,11 +534,11 @@ func (s *Server) mergeCartLine(c *gin.Context, productID int64, qty int) error {
 }
 
 type resolvedLine struct {
-	ProductID  int64   `json:"product_id"`
-	Name       string  `json:"name"`
-	Quantity   int     `json:"quantity"`
-	UnitPrice  float64 `json:"unit_price"`
-	LineTotal  float64 `json:"line_total"`
+	ProductID int64   `json:"product_id"`
+	Name      string  `json:"name"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unit_price"`
+	LineTotal float64 `json:"line_total"`
 }
 
 func (s *Server) resolveCartLines(ctx context.Context, cart models.CartPayload) ([]resolvedLine, float64, error) {
@@ -576,11 +586,23 @@ func (s *Server) placeOrder(ctx context.Context, userID uuid.UUID, storeID int64
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	var storeStatus string
+	err = tx.QueryRow(ctx, `SELECT status FROM stores WHERE id = $1`, storeID).Scan(&storeStatus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, 0, errors.New("store not found")
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	if storeStatus != "active" {
+		return 0, 0, errors.New("store is not accepting orders")
+	}
+
 	var total float64
 	type line struct {
-		pid      int64
-		qty      int
-		unit     float64
+		pid  int64
+		qty  int
+		unit float64
 	}
 	var lines []line
 	for _, ln := range cart.Lines {

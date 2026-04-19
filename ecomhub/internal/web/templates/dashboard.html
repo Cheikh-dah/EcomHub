@@ -18,7 +18,7 @@
     <h2>Your stores</h2>
     <ul>
       {{range .Stores}}
-      <li><strong>{{.Name}}</strong> — <code>{{.Subdomain}}</code> · <a href="/s/{{.Subdomain}}">storefront</a></li>
+      <li><strong>{{.Name}}</strong> — <code>{{.Subdomain}}</code> <span class="muted">({{.Status}})</span> · <a href="/s/{{.Subdomain}}">storefront</a></li>
       {{else}}
       <li class="muted">No stores yet. Create one via the API (<code>POST /api/stores</code>) or the form below.</li>
       {{end}}

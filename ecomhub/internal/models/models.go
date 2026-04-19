@@ -19,7 +19,18 @@ type Store struct {
 	Name        string    `json:"name"`
 	Subdomain   string    `json:"subdomain"`
 	Description string    `json:"description,omitempty"`
+	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// UserIdentity maps an external auth provider subject to an internal user.
+type UserIdentity struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Provider        string    `json:"provider"`
+	ProviderSubject string    `json:"provider_subject"`
+	ProviderEmail   string    `json:"provider_email,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type Product struct {
@@ -34,12 +45,12 @@ type Product struct {
 }
 
 type Order struct {
-	ID         int64     `json:"id"`
-	StoreID    int64     `json:"store_id"`
-	UserID     uuid.UUID `json:"user_id"`
-	TotalPrice float64   `json:"total_price"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64       `json:"id"`
+	StoreID    int64       `json:"store_id"`
+	UserID     uuid.UUID   `json:"user_id"`
+	TotalPrice float64     `json:"total_price"`
+	Status     string      `json:"status"`
+	CreatedAt  time.Time   `json:"created_at"`
 	Items      []OrderItem `json:"items,omitempty"`
 }
 
@@ -52,8 +63,8 @@ type OrderItem struct {
 }
 
 type CartPayload struct {
-	StoreID int64       `json:"store_id"`
-	Lines   []CartLine  `json:"lines"`
+	StoreID int64      `json:"store_id"`
+	Lines   []CartLine `json:"lines"`
 }
 
 type CartLine struct {

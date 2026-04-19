@@ -18,24 +18,25 @@ import (
 )
 
 type hubProductRow struct {
-	ID          int64
-	Name        string
-	Price       float64
-	StoreName   string
-	Subdomain   string
+	ID        int64
+	Name      string
+	Price     float64
+	StoreName string
+	Subdomain string
 }
 
 type cartLineView struct {
-	ProductID  int64
-	Name       string
-	Quantity   int
-	LineTotal  float64
+	ProductID int64
+	Name      string
+	Quantity  int
+	LineTotal float64
 }
 
 func (s *Server) hubProductsHTML(c *gin.Context) {
 	rows, err := s.pool.Query(c.Request.Context(),
 		`SELECT p.id, p.name, p.price::float8, s.name, s.subdomain
 		 FROM products p JOIN stores s ON s.id = p.store_id
+		 WHERE s.status = 'active'
 		 ORDER BY p.id DESC LIMIT 200`,
 	)
 	if err != nil {
@@ -58,7 +59,7 @@ func (s *Server) hubProductsHTML(c *gin.Context) {
 
 func (s *Server) hubStoresHTML(c *gin.Context) {
 	rows, err := s.pool.Query(c.Request.Context(),
-		`SELECT name, subdomain FROM stores ORDER BY id DESC LIMIT 200`,
+		`SELECT name, subdomain FROM stores WHERE status = 'active' ORDER BY id DESC LIMIT 200`,
 	)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "error")
@@ -90,7 +91,7 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 	prows, err := s.pool.Query(c.Request.Context(),
 		`SELECT p.id, p.name, p.price::float8, s.name, s.subdomain
 		 FROM products p JOIN stores s ON s.id = p.store_id
-		 WHERE p.name ILIKE $1 OR p.description ILIKE $1
+		 WHERE s.status = 'active' AND (p.name ILIKE $1 OR p.description ILIKE $1)
 		 ORDER BY p.id DESC LIMIT 50`, pat,
 	)
 	if err != nil {
@@ -108,7 +109,7 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 		plist = append(plist, r)
 	}
 	srows, err := s.pool.Query(c.Request.Context(),
-		`SELECT name, subdomain FROM stores WHERE name ILIKE $1 OR description ILIKE $1 OR subdomain ILIKE $1 ORDER BY id DESC LIMIT 50`,
+		`SELECT name, subdomain FROM stores WHERE status = 'active' AND (name ILIKE $1 OR description ILIKE $1 OR subdomain ILIKE $1) ORDER BY id DESC LIMIT 50`,
 		pat,
 	)
 	if err != nil {
@@ -134,9 +135,9 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 func (s *Server) loadStoreBySubdomain(ctx context.Context, sub string) (models.Store, error) {
 	var st models.Store
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, user_id, name, subdomain, description, created_at FROM stores WHERE subdomain = $1`,
+		`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE subdomain = $1 AND status = 'active'`,
 		sub,
-	).Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.CreatedAt)
+	).Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return st, err
 	}
@@ -358,14 +359,14 @@ func (s *Server) dashboardGet(c *gin.Context) {
 	data := dashboardData{LoggedIn: ok, Token: ok}
 	if ok {
 		rows, err := s.pool.Query(c.Request.Context(),
-			`SELECT id, user_id, name, subdomain, description, created_at FROM stores WHERE user_id = $1 ORDER BY id`,
+			`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE user_id = $1 ORDER BY id`,
 			uid,
 		)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var st models.Store
-				if err := rows.Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.CreatedAt); err == nil {
+				if err := rows.Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt); err == nil {
 					data.Stores = append(data.Stores, st)
 				}
 			}

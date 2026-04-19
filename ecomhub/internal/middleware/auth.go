@@ -8,24 +8,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const ctxUserID = "userID"
 
-func RequireAuth(jwtSecret string) gin.HandlerFunc {
+// RequireAuth verifies a Supabase access token (HS256, SUPABASE_JWT_SECRET) and maps
+// sub → user_identities → internal user id, or falls back to the legacy app-signed JWT (JWT_SECRET).
+func RequireAuth(pool *pgxpool.Pool, supabaseJWTSecret, appJWTSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization"})
 			return
 		}
-		claims, err := auth.ParseToken(token, jwtSecret)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret, appJWTSecret); ok {
+			c.Set(ctxUserID, uid)
+			c.Next()
 			return
 		}
-		c.Set(ctxUserID, claims.UserID)
-		c.Next()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 	}
 }
 
@@ -38,21 +40,35 @@ func UserID(c *gin.Context) (uuid.UUID, bool) {
 	return id, ok
 }
 
-func OptionalAuth(jwtSecret string) gin.HandlerFunc {
+// OptionalAuth sets ctxUserID when a valid token is present; invalid tokens are ignored.
+func OptionalAuth(pool *pgxpool.Pool, supabaseJWTSecret, appJWTSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.Next()
 			return
 		}
-		claims, err := auth.ParseToken(token, jwtSecret)
-		if err != nil {
-			c.Next()
-			return
+		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret, appJWTSecret); ok {
+			c.Set(ctxUserID, uid)
 		}
-		c.Set(ctxUserID, claims.UserID)
 		c.Next()
 	}
+}
+
+func authenticate(c *gin.Context, pool *pgxpool.Pool, token, supabaseJWTSecret, appJWTSecret string) (uuid.UUID, bool) {
+	ctx := c.Request.Context()
+	if sub, email, err := auth.VerifySupabaseAccessToken(token, supabaseJWTSecret); err == nil {
+		internalID, err := auth.ResolveSupabaseUser(ctx, pool, sub, email)
+		if err != nil {
+			return uuid.Nil, false
+		}
+		return internalID, true
+	}
+	claims, err := auth.ParseToken(token, appJWTSecret)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return claims.UserID, true
 }
 
 func extractBearer(c *gin.Context) string {
