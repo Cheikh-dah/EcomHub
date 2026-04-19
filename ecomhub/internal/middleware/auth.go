@@ -14,15 +14,15 @@ import (
 const ctxUserID = "userID"
 
 // RequireAuth verifies a Supabase access token (HS256, SUPABASE_JWT_SECRET) and maps
-// sub → user_identities → internal user id, or falls back to the legacy app-signed JWT (JWT_SECRET).
-func RequireAuth(pool *pgxpool.Pool, supabaseJWTSecret, appJWTSecret string) gin.HandlerFunc {
+// sub → user_identities → internal user id.
+func RequireAuth(pool *pgxpool.Pool, supabaseJWTSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization"})
 			return
 		}
-		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret, appJWTSecret); ok {
+		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret); ok {
 			c.Set(ctxUserID, uid)
 			c.Next()
 			return
@@ -40,35 +40,32 @@ func UserID(c *gin.Context) (uuid.UUID, bool) {
 	return id, ok
 }
 
-// OptionalAuth sets ctxUserID when a valid token is present; invalid tokens are ignored.
-func OptionalAuth(pool *pgxpool.Pool, supabaseJWTSecret, appJWTSecret string) gin.HandlerFunc {
+// OptionalAuth sets ctxUserID when a valid Supabase token is present; invalid tokens are ignored.
+func OptionalAuth(pool *pgxpool.Pool, supabaseJWTSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.Next()
 			return
 		}
-		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret, appJWTSecret); ok {
+		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret); ok {
 			c.Set(ctxUserID, uid)
 		}
 		c.Next()
 	}
 }
 
-func authenticate(c *gin.Context, pool *pgxpool.Pool, token, supabaseJWTSecret, appJWTSecret string) (uuid.UUID, bool) {
+func authenticate(c *gin.Context, pool *pgxpool.Pool, token, supabaseJWTSecret string) (uuid.UUID, bool) {
 	ctx := c.Request.Context()
-	if sub, email, err := auth.VerifySupabaseAccessToken(token, supabaseJWTSecret); err == nil {
-		internalID, err := auth.ResolveSupabaseUser(ctx, pool, sub, email)
-		if err != nil {
-			return uuid.Nil, false
-		}
-		return internalID, true
-	}
-	claims, err := auth.ParseToken(token, appJWTSecret)
+	sub, email, _, err := auth.VerifySupabaseAccessToken(token, supabaseJWTSecret)
 	if err != nil {
 		return uuid.Nil, false
 	}
-	return claims.UserID, true
+	internalID, err := auth.ResolveSupabaseUser(ctx, pool, sub, email)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return internalID, true
 }
 
 func extractBearer(c *gin.Context) string {
@@ -77,7 +74,7 @@ func extractBearer(c *gin.Context) string {
 		return strings.TrimSpace(h[7:])
 	}
 	if cookie, err := c.Cookie("auth_token"); err == nil && cookie != "" {
-		return cookie
+		return strings.TrimSpace(cookie)
 	}
 	return ""
 }

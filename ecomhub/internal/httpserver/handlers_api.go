@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
-	"ecomhub/internal/auth"
 	"ecomhub/internal/middleware"
 	"ecomhub/internal/models"
 
@@ -18,16 +18,6 @@ import (
 )
 
 var subdomainRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-type registerBody struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-}
-
-type loginBody struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
 
 type storeBody struct {
 	Name        string `json:"name" binding:"required"`
@@ -65,72 +55,12 @@ type orderCreateBody struct {
 	StoreID int64 `json:"store_id"`
 }
 
-func (s *Server) apiRegister(c *gin.Context) {
-	var body registerBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-		return
-	}
-	hash, err := auth.HashPassword(body.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not hash password"})
-		return
-	}
-	var id uuid.UUID
-	err = s.pool.QueryRow(c.Request.Context(),
-		`INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id`,
-		strings.ToLower(strings.TrimSpace(body.Email)), hash,
-	).Scan(&id)
-	if err != nil {
-		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
-			c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "registration failed"})
-		return
-	}
-	token, err := auth.SignToken(id, s.cfg.JWTSecret, s.cfg.JWTExpiry)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{"token": token, "user_id": id.String()})
-}
-
-func (s *Server) apiLogin(c *gin.Context) {
-	var body loginBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-		return
-	}
-	var id uuid.UUID
-	var hash string
-	err := s.pool.QueryRow(c.Request.Context(),
-		`SELECT id, password_hash FROM users WHERE email = $1`,
-		strings.ToLower(strings.TrimSpace(body.Email)),
-	).Scan(&id, &hash)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-	if !auth.CheckPassword(hash, body.Password) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-	token, err := auth.SignToken(id, s.cfg.JWTSecret, s.cfg.JWTExpiry)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"token": token, "user_id": id.String()})
-}
-
 func (s *Server) apiLogout(c *gin.Context) {
-	clearAuthCookie(c)
+	clearAuthCookie(c, s.cfg.Environment)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// apiMe returns the internal user id after Supabase (sub → user_identities) or legacy JWT resolution.
+// apiMe returns the internal user id after Supabase JWT resolution (sub → user_identities).
 func (s *Server) apiMe(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {
@@ -321,35 +251,52 @@ func (s *Server) apiUpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	name := ""
-	desc := ""
-	price := 0.0
-	stock := 0
-	img := ""
-	_ = s.pool.QueryRow(c.Request.Context(),
-		`SELECT name, COALESCE(description,''), price::float8, stock, COALESCE(image_url,'') FROM products WHERE id = $1`, id,
-	).Scan(&name, &desc, &price, &stock, &img)
+	setName := body.Name != nil
+	nameVal := ""
 	if body.Name != nil {
-		name = strings.TrimSpace(*body.Name)
+		nameVal = strings.TrimSpace(*body.Name)
 	}
+	setDesc := body.Description != nil
+	descVal := ""
 	if body.Description != nil {
-		desc = strings.TrimSpace(*body.Description)
+		descVal = strings.TrimSpace(*body.Description)
 	}
+	setPrice := body.Price != nil
+	priceVal := 0.0
 	if body.Price != nil {
-		price = *body.Price
+		priceVal = *body.Price
 	}
+	setStock := body.Stock != nil
+	stockVal := 0
 	if body.Stock != nil {
-		stock = *body.Stock
+		stockVal = *body.Stock
 	}
+	setImg := body.ImageURL != nil
+	imgVal := ""
 	if body.ImageURL != nil {
-		img = strings.TrimSpace(*body.ImageURL)
+		imgVal = strings.TrimSpace(*body.ImageURL)
 	}
-	_, err = s.pool.Exec(c.Request.Context(),
-		`UPDATE products SET name = $1, description = $2, price = $3, stock = $4, image_url = NULLIF($5,'') WHERE id = $6`,
-		name, desc, price, stock, img, id,
+	cmd, err := s.pool.Exec(c.Request.Context(),
+		`UPDATE products SET
+			name = CASE WHEN $1 THEN $2::text ELSE name END,
+			description = CASE WHEN $3 THEN $4::text ELSE description END,
+			price = CASE WHEN $5 THEN $6::numeric ELSE price END,
+			stock = CASE WHEN $7 THEN $8::int ELSE stock END,
+			image_url = CASE WHEN $9 THEN NULLIF($10::text, '') ELSE image_url END
+		WHERE id = $11`,
+		setName, nameVal,
+		setDesc, descVal,
+		setPrice, priceVal,
+		setStock, stockVal,
+		setImg, imgVal,
+		id,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+	if cmd.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -545,32 +492,28 @@ func (s *Server) resolveCartLines(ctx context.Context, cart models.CartPayload) 
 	if cart.StoreID == 0 || len(cart.Lines) == 0 {
 		return nil, 0, nil
 	}
+	ids := sortedUniqueProductIDs(cart.Lines)
+	prows, err := fetchProductsByStore(ctx, s.pool, cart.StoreID, ids, false)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(prows) != len(ids) {
+		return nil, 0, errors.New("product not found in cart")
+	}
 	var total float64
 	var out []resolvedLine
 	for _, ln := range cart.Lines {
-		var name string
-		var price float64
-		var stock int
-		var sid int64
-		err := s.pool.QueryRow(ctx,
-			`SELECT store_id, name, price::float8, stock FROM products WHERE id = $1`, ln.ProductID,
-		).Scan(&sid, &name, &price, &stock)
-		if errors.Is(err, pgx.ErrNoRows) {
+		p, ok := prows[ln.ProductID]
+		if !ok {
 			return nil, 0, errors.New("product not found in cart")
 		}
-		if err != nil {
-			return nil, 0, err
+		if ln.Quantity > p.Stock {
+			return nil, 0, errors.New("insufficient stock for " + p.Name)
 		}
-		if sid != cart.StoreID {
-			return nil, 0, errors.New("cart corrupted")
-		}
-		if ln.Quantity > stock {
-			return nil, 0, errors.New("insufficient stock for " + name)
-		}
-		lineTotal := price * float64(ln.Quantity)
+		lineTotal := p.Price * float64(ln.Quantity)
 		total += lineTotal
 		out = append(out, resolvedLine{
-			ProductID: ln.ProductID, Name: name, Quantity: ln.Quantity, UnitPrice: price, LineTotal: lineTotal,
+			ProductID: ln.ProductID, Name: p.Name, Quantity: ln.Quantity, UnitPrice: p.Price, LineTotal: lineTotal,
 		})
 	}
 	return out, total, nil
@@ -598,6 +541,15 @@ func (s *Server) placeOrder(ctx context.Context, userID uuid.UUID, storeID int64
 		return 0, 0, errors.New("store is not accepting orders")
 	}
 
+	ids := sortedUniqueProductIDs(cart.Lines)
+	prows, err := fetchProductsByStore(ctx, tx, storeID, ids, true)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(prows) != len(ids) {
+		return 0, 0, errors.New("product missing")
+	}
+
 	var total float64
 	type line struct {
 		pid  int64
@@ -606,26 +558,15 @@ func (s *Server) placeOrder(ctx context.Context, userID uuid.UUID, storeID int64
 	}
 	var lines []line
 	for _, ln := range cart.Lines {
-		var sid int64
-		var stock int
-		var price float64
-		err := tx.QueryRow(ctx,
-			`SELECT store_id, stock, price::float8 FROM products WHERE id = $1 FOR UPDATE`, ln.ProductID,
-		).Scan(&sid, &stock, &price)
-		if errors.Is(err, pgx.ErrNoRows) {
+		p, ok := prows[ln.ProductID]
+		if !ok {
 			return 0, 0, errors.New("product missing")
 		}
-		if err != nil {
-			return 0, 0, err
-		}
-		if sid != storeID {
-			return 0, 0, errors.New("store mismatch")
-		}
-		if ln.Quantity > stock {
+		if ln.Quantity > p.Stock {
 			return 0, 0, errors.New("insufficient stock")
 		}
-		lines = append(lines, line{pid: ln.ProductID, qty: ln.Quantity, unit: price})
-		total += price * float64(ln.Quantity)
+		lines = append(lines, line{pid: ln.ProductID, qty: ln.Quantity, unit: p.Price})
+		total += p.Price * float64(ln.Quantity)
 	}
 
 	var orderID int64
@@ -653,4 +594,61 @@ func (s *Server) placeOrder(ctx context.Context, userID uuid.UUID, storeID int64
 		return 0, 0, err
 	}
 	return orderID, total, nil
+}
+
+type dbQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+type productStockRow struct {
+	ID      int64
+	StoreID int64
+	Name    string
+	Price   float64
+	Stock   int
+}
+
+func sortedUniqueProductIDs(lines []models.CartLine) []int64 {
+	seen := make(map[int64]struct{})
+	var ids []int64
+	for _, ln := range lines {
+		if ln.ProductID < 1 {
+			continue
+		}
+		if _, ok := seen[ln.ProductID]; ok {
+			continue
+		}
+		seen[ln.ProductID] = struct{}{}
+		ids = append(ids, ln.ProductID)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+// fetchProductsByStore loads products for a store by id list. If forUpdate is true, rows are locked in id order.
+func fetchProductsByStore(ctx context.Context, q dbQuerier, storeID int64, ids []int64, forUpdate bool) (map[int64]productStockRow, error) {
+	out := make(map[int64]productStockRow)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	sql := `SELECT id, store_id, name, price::float8, stock FROM products WHERE store_id = $1 AND id = ANY($2::bigint[]) ORDER BY id`
+	if forUpdate {
+		sql += ` FOR UPDATE`
+	}
+	rows, err := q.Query(ctx, sql, storeID, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p productStockRow
+		if scanErr := rows.Scan(&p.ID, &p.StoreID, &p.Name, &p.Price, &p.Stock); scanErr != nil {
+			return nil, scanErr
+		}
+		out[p.ID] = p
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

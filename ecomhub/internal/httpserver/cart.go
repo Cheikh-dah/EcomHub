@@ -56,24 +56,31 @@ func clearCartCookie(c *gin.Context) {
 	})
 }
 
-func setAuthCookie(c *gin.Context, token string) {
+func setAuthCookie(c *gin.Context, token, environment string, maxAge int) {
+	if maxAge < 1 {
+		maxAge = 3600
+	}
+	secure := environment == "production"
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
-		MaxAge:   86400 * 30,
+		MaxAge:   maxAge,
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func clearAuthCookie(c *gin.Context) {
+func clearAuthCookie(c *gin.Context, environment string) {
+	secure := environment == "production"
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

@@ -106,9 +106,9 @@ Payments, reviews, better search, seller analytics, image CDN/storage.
 
 ## 5. Data model (MVP)
 
-**users:** id, email, created_at  
+**users:** id, email, `password_hash` (nullable for Supabase-only accounts), created_at  
 
-**user_identities:** id, user_id, provider, provider_subject, provider_email, created_at  
+**user_identities:** id, user_id, provider (`supabase`), provider_subject (Supabase JWT `sub`), provider_email, created_at; unique `(provider, provider_subject)`  
 
 **stores:** id, user_id, name, subdomain (unique), description, **status** (`active` \| `suspended` \| `deleted`), created_at  
 
@@ -120,7 +120,7 @@ Payments, reviews, better search, seller analytics, image CDN/storage.
 
 ## 6. API surface (target)
 
-**Auth:** Supabase-backed routes; middleware maps provider → internal `userID`.
+**Auth:** Supabase access token verified with `SUPABASE_JWT_SECRET`; middleware maps `sub` → `user_identities` → internal `userID`. Dashboard: Supabase JS sign-in → `POST /dashboard/session` (sets HttpOnly `auth_token`, optional `next` redirect). `GET /api/me`, `POST /api/logout`.
 
 **Stores:** `GET/POST /api/stores`, `PUT /api/stores/:id`  
 
@@ -137,12 +137,14 @@ Payments, reviews, better search, seller analytics, image CDN/storage.
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | Postgres connection |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Client-safe key where applicable |
-| `SUPABASE_SERVICE_KEY` | Server only |
+| `SUPABASE_URL` | Supabase project URL (`https` required when `ENVIRONMENT` is `staging` or `production`) |
+| `SUPABASE_JWT_SECRET` | JWT signing secret from Supabase Dashboard → Settings → API (verifies user access tokens; **not** the service_role key) |
+| `SUPABASE_ANON_KEY` | **Required** — public anon key for the dashboard Supabase client |
+| `SUPABASE_SERVICE_KEY` | Optional — server-only when a feature needs it |
 | `PORT` | HTTP port |
-| `ENVIRONMENT` | e.g. development / production |
-| `BASE_HOST` | Production: `ecomhub.com`; dev: `localhost`; empty → path-only `/s/{subdomain}` |
+| `ENVIRONMENT` | `development`, `staging`, or `production` |
+| `APP_URL` | Optional public app base URL (`https` required in production when set) |
+| `BASE_HOST` | Optional — production: `ecomhub.com`; dev: `localhost`; empty → path-only `/s/{subdomain}` |
 
 ---
 
@@ -174,6 +176,8 @@ Payments, reviews, better search, seller analytics, image CDN/storage.
 
 ## 10. Current status (repo)
 
-- Scaffold under `ecomhub/` (Go + Gin + Postgres); routes and HTML in progress.  
-- Auth direction: Supabase + internal mapping.  
-- Next: implement managed auth, `user_identities`, store **status**, host-first routing, and schema alignment in code.
+- **Auth:** Supabase JWT in middleware; JIT `users` + `user_identities`; dashboard sign-in + `POST /dashboard/session`; HttpOnly `auth_token` max-age from JWT `exp`; safe `next` redirect after checkout login.  
+- **Schema:** `user_identities`, `stores.status`, nullable `users.password_hash`; migrations `001_init.sql` + `002_user_identities_store_status.sql` (re-applied on boot — keep SQL idempotent).  
+- **API / UI:** Store + product CRUD with owner checks; atomic product `PUT`; batched product reads for cart resolve / HTML cart / `placeOrder` lock; hub + `/s/{subdomain}` storefront; public listings use **active** stores only.  
+- **Next (product / routing):** reserved subdomain enforcement, host-first routing (`BASE_HOST`), branded inactive-store pages.  
+- **Next (scale / ops, when needed):** `pg_trgm` or dedicated search if hub `ILIKE` slows down; `schema_migrations` ledger if boot migrations stop being idempotent; optional signed/HMAC cart cookie for defense in depth (checkout already re-validates).

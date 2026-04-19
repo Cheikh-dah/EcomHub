@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -16,8 +15,6 @@ type Config struct {
 	Environment string
 	HTTPPort    string
 	DatabaseURL string
-	JWTSecret   string
-	JWTExpiry   time.Duration
 	// AppURL is the public base URL of this app (e.g. https://ecomhub.com). Optional until redirects or auth callbacks need it.
 	AppURL string
 	// BaseHost is the apex domain for subdomain resolution (e.g. "ecomhub.local" or "example.com").
@@ -29,7 +26,7 @@ type Config struct {
 	// SupabaseJWTSecret is the JWT signing secret from Supabase Dashboard → Settings → API.
 	// Used to verify Supabase-issued user access tokens (not the service_role key).
 	SupabaseJWTSecret string
-	// SupabaseAnonKey is optional until client or server features need it.
+	// SupabaseAnonKey is the public anon key (browser-safe) for the dashboard Supabase client.
 	SupabaseAnonKey string
 	// SupabaseServiceKey is optional; server-only when used.
 	SupabaseServiceKey string
@@ -38,18 +35,10 @@ type Config struct {
 func Load() Config {
 	_ = godotenv.Load()
 
-	jwtExp := getenv("JWT_EXPIRY_HOURS", "72")
-	hours, err := time.ParseDuration(jwtExp + "h")
-	if err != nil {
-		hours = 72 * time.Hour
-	}
-
 	cfg := Config{
 		Environment:        strings.ToLower(getenv("ENVIRONMENT", "development")),
 		HTTPPort:           getenv("PORT", "8080"),
 		DatabaseURL:        strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		JWTSecret:          strings.TrimSpace(os.Getenv("JWT_SECRET")),
-		JWTExpiry:          hours,
 		AppURL:             strings.TrimSpace(os.Getenv("APP_URL")),
 		BaseHost:           strings.TrimSpace(os.Getenv("BASE_HOST")),
 		SupabaseURL:        strings.TrimSpace(os.Getenv("SUPABASE_URL")),
@@ -83,9 +72,6 @@ func validate(cfg Config) {
 			log.Fatal("APP_URL must use https in production")
 		}
 	}
-	if cfg.JWTSecret == "" || len(cfg.JWTSecret) < 16 {
-		log.Fatal("JWT_SECRET is required and must be at least 16 characters (used until Supabase-backed auth replaces app-signed tokens)")
-	}
 	if cfg.SupabaseURL == "" {
 		log.Fatal("SUPABASE_URL is required (Supabase project URL, e.g. https://xxxx.supabase.co)")
 	}
@@ -102,8 +88,8 @@ func validate(cfg Config) {
 	if cfg.SupabaseJWTSecret == "" || len(cfg.SupabaseJWTSecret) < 16 {
 		log.Fatal("SUPABASE_JWT_SECRET is required and must be at least 16 characters (JWT Secret from Supabase API settings — not the service_role key)")
 	}
-	if cfg.SupabaseAnonKey != "" && len(cfg.SupabaseAnonKey) < 20 {
-		log.Fatal("SUPABASE_ANON_KEY must be at least 20 characters when set")
+	if cfg.SupabaseAnonKey == "" || len(cfg.SupabaseAnonKey) < 20 {
+		log.Fatal("SUPABASE_ANON_KEY is required and must be at least 20 characters (public anon key for the dashboard Supabase client)")
 	}
 	if cfg.SupabaseServiceKey != "" && len(cfg.SupabaseServiceKey) < 20 {
 		log.Fatal("SUPABASE_SERVICE_KEY must be at least 20 characters when set")

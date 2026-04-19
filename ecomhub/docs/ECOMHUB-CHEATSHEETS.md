@@ -94,7 +94,7 @@ SELECT … FROM products WHERE store_id = ? AND …
 | Layer | Pattern |
 |-------|---------|
 | **App** | Stateless Go instances behind load balancer |
-| **Session** | Redis or JWT + short-lived tokens |
+| **Session** | Redis or short-lived tokens (today: Supabase access token in HttpOnly cookie, re-verified per request) |
 | **DB** | Replicas first; sharding only with clear pain |
 
 ---
@@ -136,7 +136,7 @@ Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + an
 | Area | In scope |
 |------|----------|
 | **Product** | Multi-tenant stores + hosted storefront + hub-lite discovery |
-| **Auth** | Register / login / logout; JWT; bcrypt |
+| **Auth** | Supabase Auth (dashboard JS); `POST /dashboard/session` → HttpOnly cookie; `GET /api/me`; middleware verifies Supabase JWT + `user_identities` |
 | **Stores** | CRUD metadata; subdomain/slug; user owns 1+ stores |
 | **Products** | CRUD; name, description, price, stock, images |
 | **Storefront** | Public home + product detail (subdomain) |
@@ -152,8 +152,9 @@ Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + an
 
 | Entity | Key fields |
 |--------|------------|
-| **User** | `id`, `email`, `password_hash`, `created_at` |
-| **Store** | `id`, `user_id`, `name`, `subdomain`, `description`, `created_at` |
+| **User** | `id`, `email`, `password_hash` (nullable for Supabase-only), `created_at` |
+| **UserIdentity** | `user_id`, `provider` (`supabase`), `provider_subject` (JWT `sub`), `provider_email`, unique `(provider, provider_subject)` |
+| **Store** | `id`, `user_id`, `name`, `subdomain`, `description`, `status` (`active` \| `suspended` \| `deleted`), `created_at` |
 | **Product** | `id`, `store_id`, `name`, `description`, `price`, `stock`, `image_url`, `created_at` |
 | **Order** | `id`, `store_id`, `total_price`, `status`, `created_at` |
 | **OrderItem** | `id`, `order_id`, `product_id`, `quantity`, `price` |
@@ -166,7 +167,7 @@ Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + an
 
 | Domain | Examples |
 |--------|----------|
-| **Auth** | `POST /api/register`, `POST /api/login` |
+| **Auth** | `POST /dashboard/session` (JSON `access_token`, optional `next`); `POST /api/logout`; `GET /api/me` (cookie or `Authorization: Bearer` Supabase access token) |
 | **Stores** | `POST /api/stores`, `GET /api/stores` |
 | **Products** | `POST /api/products`, `GET /api/products`, `PUT /api/products/{id}`, `DELETE /api/products/{id}` |
 | **Orders** | `POST /api/orders`, `GET /api/orders` |
@@ -179,11 +180,23 @@ Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + an
 
 ## 9) Implementation milestones (checklist)
 
-- [ ] **Foundation:** Go app, migrations, auth
-- [ ] **Store + products:** CRUD + `store_id` scoping + owner checks
-- [ ] **Storefront:** subdomain middleware + public pages
-- [ ] **Commerce:** cart → order; mock payment
-- [ ] **Hub:** global listings + basic search (SQL or dedicated search later)
+- [x] **Foundation:** Go app, Postgres migrations (`001` init + `002` identities / `stores.status`), Supabase JWT auth + JIT `user_identities`
+- [x] **Store + products:** CRUD + `store_id` scoping + owner checks; partial product `PUT` uses single atomic `UPDATE`
+- [ ] **Storefront:** host-first subdomain middleware (optional `BASE_HOST`); `/s/{subdomain}` fallback exists
+- [x] **Commerce:** cookie cart → `placeOrder` (transaction + `FOR UPDATE` stock); HTML + API paths
+- [x] **Hub:** global listings + `ILIKE` search (`/products`, `/stores`, `/search`)
+
+**Notes:** Migrations re-run on each boot (keep SQL idempotent). Cart cookie is unsigned JSON; **checkout always re-validates** store, lines, and stock, so tampering cannot bypass server rules.
+
+**Optional later (not blocking MVP):**
+
+| Item | When it matters |
+|------|-------------------|
+| **`schema_migrations` ledger** | When you add migrations that are **not** safe to re-`EXEC` on every boot. |
+| **Cart HMAC / signed payload** | Extra tamper-evidence; **not** a substitute for checkout validation (already required). |
+| **`pg_trgm` or FTS** | When hub `ILIKE '%q%'` gets **slow** or tables are **large**; until then Postgres is fine. |
+
+Cart HTML, `resolveCartLines`, and `placeOrder` already use **batched** `SELECT … WHERE id = ANY($ids)` (plus `FOR UPDATE` in `placeOrder`) — **no N+1** on those paths.
 
 ---
 

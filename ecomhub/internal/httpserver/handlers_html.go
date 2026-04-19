@@ -2,7 +2,9 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,7 +15,6 @@ import (
 	"ecomhub/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -291,23 +292,24 @@ func (s *Server) storeCartHTML(c *gin.Context) {
 	}
 	var lines []cartLineView
 	var total float64
-	if errMsg == "" && cart.StoreID == st.ID {
+	if errMsg == "" && cart.StoreID == st.ID && len(cart.Lines) > 0 {
+		ids := sortedUniqueProductIDs(cart.Lines)
+		prows, e := fetchProductsByStore(c.Request.Context(), s.pool, st.ID, ids, false)
+		if e != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 		for _, ln := range cart.Lines {
-			var name string
-			var price float64
-			var sid int64
-			e := s.pool.QueryRow(c.Request.Context(),
-				`SELECT store_id, name, price::float8 FROM products WHERE id = $1`, ln.ProductID,
-			).Scan(&sid, &name, &price)
-			if e != nil {
+			p, ok := prows[ln.ProductID]
+			if !ok {
 				continue
 			}
-			if sid != st.ID {
+			if p.StoreID != st.ID {
 				continue
 			}
-			lt := price * float64(ln.Quantity)
+			lt := p.Price * float64(ln.Quantity)
 			total += lt
-			lines = append(lines, cartLineView{ProductID: ln.ProductID, Name: name, Quantity: ln.Quantity, LineTotal: lt})
+			lines = append(lines, cartLineView{ProductID: ln.ProductID, Name: p.Name, Quantity: ln.Quantity, LineTotal: lt})
 		}
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -347,16 +349,86 @@ func (s *Server) storeCheckout(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/s/"+sub+"/cart?thanks=1")
 }
 
+// safeInternalRedirectPath returns a same-origin path for post-login redirects.
+// Rejects empty, non-root-relative, protocol-relative, and absolute-URL values.
+func safeInternalRedirectPath(next string) string {
+	next = strings.TrimSpace(next)
+	next = strings.ReplaceAll(next, "\r", "")
+	next = strings.ReplaceAll(next, "\n", "")
+	if next == "" {
+		return "/dashboard"
+	}
+	if !strings.HasPrefix(next, "/") {
+		return "/dashboard"
+	}
+	if strings.HasPrefix(next, "//") {
+		return "/dashboard"
+	}
+	if strings.Contains(strings.ToLower(next), "://") {
+		return "/dashboard"
+	}
+	return next
+}
+
 type dashboardData struct {
-	LoggedIn bool
-	Token    bool
-	Stores   []models.Store
-	Error    string
+	LoggedIn       bool
+	Token          bool
+	Stores         []models.Store
+	Error          string
+	SupabasePublic template.JS
+}
+
+func (s *Server) dashboardSupabasePublicJSON() template.JS {
+	b, err := json.Marshal(map[string]string{
+		"url":     s.cfg.SupabaseURL,
+		"anonKey": s.cfg.SupabaseAnonKey,
+	})
+	if err != nil {
+		return template.JS("{}")
+	}
+	return template.JS(b)
+}
+
+func (s *Server) dashboardSession(c *gin.Context) {
+	var body struct {
+		AccessToken string `json:"access_token"`
+		Next        string `json:"next"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.AccessToken) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "access_token required"})
+		return
+	}
+	ctx := c.Request.Context()
+	sub, email, maxAge, err := auth.VerifySupabaseAccessToken(body.AccessToken, s.cfg.SupabaseJWTSecret)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+	if _, err := auth.ResolveSupabaseUser(ctx, s.pool, sub, email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not resolve user"})
+		return
+	}
+	setAuthCookie(c, body.AccessToken, s.cfg.Environment, maxAge)
+	redirect := safeInternalRedirectPath(body.Next)
+	c.JSON(http.StatusOK, gin.H{"ok": true, "redirect": redirect})
 }
 
 func (s *Server) dashboardGet(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
-	data := dashboardData{LoggedIn: ok, Token: ok}
+	if ok {
+		if n := strings.TrimSpace(c.Query("next")); n != "" {
+			dest := safeInternalRedirectPath(n)
+			if dest != "/dashboard" {
+				c.Redirect(http.StatusSeeOther, dest)
+				return
+			}
+		}
+	}
+	data := dashboardData{
+		LoggedIn:       ok,
+		Token:          ok,
+		SupabasePublic: s.dashboardSupabasePublicJSON(),
+	}
 	if ok {
 		rows, err := s.pool.Query(c.Request.Context(),
 			`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE user_id = $1 ORDER BY id`,
@@ -376,67 +448,17 @@ func (s *Server) dashboardGet(c *gin.Context) {
 	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", data)
 }
 
-func (s *Server) dashboardRegister(c *gin.Context) {
-	_ = c.Request.ParseForm()
-	email := strings.TrimSpace(c.PostForm("email"))
-	pass := c.PostForm("password")
-	if email == "" || len(pass) < 8 {
-		s.dashboardErr(c, "Invalid email or password (min 8 chars).")
-		return
-	}
-	hash, err := auth.HashPassword(pass)
-	if err != nil {
-		s.dashboardErr(c, "Could not register.")
-		return
-	}
-	var id uuid.UUID
-	err = s.pool.QueryRow(c.Request.Context(),
-		`INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id`,
-		strings.ToLower(email), hash,
-	).Scan(&id)
-	if err != nil {
-		s.dashboardErr(c, "Email may already be registered.")
-		return
-	}
-	token, err := auth.SignToken(id, s.cfg.JWTSecret, s.cfg.JWTExpiry)
-	if err != nil {
-		s.dashboardErr(c, "Token error.")
-		return
-	}
-	setAuthCookie(c, token)
-	c.Redirect(http.StatusSeeOther, "/dashboard")
-}
-
-func (s *Server) dashboardLogin(c *gin.Context) {
-	_ = c.Request.ParseForm()
-	email := strings.ToLower(strings.TrimSpace(c.PostForm("email")))
-	pass := c.PostForm("password")
-	var id uuid.UUID
-	var hash string
-	err := s.pool.QueryRow(c.Request.Context(),
-		`SELECT id, password_hash FROM users WHERE email = $1`, email,
-	).Scan(&id, &hash)
-	if err != nil || !auth.CheckPassword(hash, pass) {
-		s.dashboardErr(c, "Invalid credentials.")
-		return
-	}
-	token, err := auth.SignToken(id, s.cfg.JWTSecret, s.cfg.JWTExpiry)
-	if err != nil {
-		s.dashboardErr(c, "Token error.")
-		return
-	}
-	setAuthCookie(c, token)
-	c.Redirect(http.StatusSeeOther, "/dashboard")
-}
-
 func (s *Server) dashboardLogout(c *gin.Context) {
-	clearAuthCookie(c)
+	clearAuthCookie(c, s.cfg.Environment)
 	c.Redirect(http.StatusSeeOther, "/dashboard")
 }
 
 func (s *Server) dashboardErr(c *gin.Context, msg string) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", dashboardData{Error: msg})
+	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", dashboardData{
+		Error:          msg,
+		SupabasePublic: s.dashboardSupabasePublicJSON(),
+	})
 }
 
 func (s *Server) dashboardCreateStore(c *gin.Context) {
