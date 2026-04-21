@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -13,16 +14,15 @@ import (
 
 const ctxUserID = "userID"
 
-// RequireAuth verifies a Supabase access token (HS256, SUPABASE_JWT_SECRET) and maps
-// sub → user_identities → internal user id.
-func RequireAuth(pool *pgxpool.Pool, supabaseJWTSecret string) gin.HandlerFunc {
+// RequireAuth verifies a Clerk session JWT and maps sub → user_identities → internal user id.
+func RequireAuth(pool *pgxpool.Pool, authorizedParties []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization"})
 			return
 		}
-		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret); ok {
+		if uid, ok := authenticate(c.Request.Context(), pool, token, authorizedParties); ok {
 			c.Set(ctxUserID, uid)
 			c.Next()
 			return
@@ -40,28 +40,27 @@ func UserID(c *gin.Context) (uuid.UUID, bool) {
 	return id, ok
 }
 
-// OptionalAuth sets ctxUserID when a valid Supabase token is present; invalid tokens are ignored.
-func OptionalAuth(pool *pgxpool.Pool, supabaseJWTSecret string) gin.HandlerFunc {
+// OptionalAuth sets ctxUserID when a valid Clerk session token is present; invalid tokens are ignored.
+func OptionalAuth(pool *pgxpool.Pool, authorizedParties []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
 			c.Next()
 			return
 		}
-		if uid, ok := authenticate(c, pool, token, supabaseJWTSecret); ok {
+		if uid, ok := authenticate(c.Request.Context(), pool, token, authorizedParties); ok {
 			c.Set(ctxUserID, uid)
 		}
 		c.Next()
 	}
 }
 
-func authenticate(c *gin.Context, pool *pgxpool.Pool, token, supabaseJWTSecret string) (uuid.UUID, bool) {
-	ctx := c.Request.Context()
-	sub, email, _, err := auth.VerifySupabaseAccessToken(token, supabaseJWTSecret)
+func authenticate(ctx context.Context, pool *pgxpool.Pool, token string, authorizedParties []string) (uuid.UUID, bool) {
+	clerkUserID, _, err := auth.VerifyClerkSessionJWT(ctx, token, authorizedParties)
 	if err != nil {
 		return uuid.Nil, false
 	}
-	internalID, err := auth.ResolveSupabaseUser(ctx, pool, sub, email)
+	internalID, err := auth.ResolveClerkUser(ctx, pool, clerkUserID)
 	if err != nil {
 		return uuid.Nil, false
 	}

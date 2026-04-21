@@ -13,7 +13,7 @@
   <h1>Merchant dashboard</h1>
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
   {{if .Token}}
-  <p class="success">You are signed in with Supabase. The session cookie is sent automatically for this site and for API calls from this origin.</p>
+  <p class="success">You are signed in with Clerk. The session cookie is sent automatically for this site and for API calls from this origin.</p>
   <section>
     <h2>Your stores</h2>
     <ul>
@@ -26,102 +26,212 @@
     <h3>Create store</h3>
     <form method="post" action="/dashboard/stores" class="stack-form">
       <label>Name <input name="name" required></label>
-      <label>Subdomain <input name="subdomain" pattern="[a-z0-9][a-z0-9-]{1,62}[a-z0-9]" required placeholder="my-shop"></label>
+      <label>Subdomain <input id="dashboard-store-subdomain" name="subdomain" maxlength="63" pattern="[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" required placeholder="my-shop" title="Letters, numbers, hyphens; no leading or trailing hyphen; max 63 characters. Lowercased as you type to match how it is stored."></label>
       <label>Description <textarea name="description"></textarea></label>
       <button type="submit">Create store</button>
     </form>
     <form method="post" action="/dashboard/logout" class="stack-form" style="margin-top:1rem">
       <button type="submit">Sign out</button>
     </form>
+    <script>
+      (function () {
+        var el = document.getElementById('dashboard-store-subdomain');
+        if (!el) return;
+        el.addEventListener('input', function () {
+          var v = el.value.toLowerCase();
+          if (el.value !== v) el.value = v;
+        });
+      })();
+    </script>
   </section>
   {{else}}
   <section class="auth-panel">
-    <p class="muted">Sign in or create an account with Supabase (same credentials as your Supabase project). After sign-in, your access token is stored in an HttpOnly cookie for this app.</p>
+    <noscript><p class="error">JavaScript is required to sign in.</p></noscript>
+    <p class="muted">Sign in or create an account with Clerk (configured for this app). After sign-in, your Clerk session token is stored in an HttpOnly cookie for this server.</p>
     <p id="auth-client-error" class="error" style="display:none" role="alert"></p>
-    <h2>Create account</h2>
-    <form id="signup-form" class="stack-form">
-      <label>Email <input type="email" name="email" autocomplete="email" required></label>
-      <label>Password <input type="password" name="password" autocomplete="new-password" required minlength="8"></label>
-      <button type="submit">Sign up</button>
-    </form>
-    <h2>Sign in</h2>
-    <form id="signin-form" class="stack-form">
-      <label>Email <input type="email" name="email" autocomplete="email" required></label>
-      <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
-      <button type="submit">Sign in</button>
-    </form>
+    <div id="clerk-signin-root"></div>
   </section>
+  <script type="application/json" id="ecomhub-clerk-bootstrap">{{.ClerkBootstrapJSON}}</script>
   <script type="module">
-    const cfg = {{.SupabasePublic}};
-    const errEl = document.getElementById('auth-client-error');
-    function showErr(msg) {
-      errEl.textContent = msg;
-      errEl.style.display = msg ? 'block' : 'none';
-    }
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-    const supabase = createClient(cfg.url, cfg.anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
+    async function main() {
+      const errEl = document.getElementById('auth-client-error');
+      function showErr(msg) {
+        if (!errEl) return;
+        errEl.textContent = msg;
+        errEl.style.display = msg ? 'block' : 'none';
+      }
 
-    const nextParam = new URLSearchParams(window.location.search).get('next') || '';
+      let env = {};
+      try {
+        const boot = document.getElementById('ecomhub-clerk-bootstrap');
+        const raw = (boot && boot.textContent) ? boot.textContent.trim() : '';
+        env = raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        showErr('Invalid auth configuration.');
+        return;
+      }
+      const publishableKey = typeof env.publishableKey === 'string' ? env.publishableKey.trim() : '';
+      const frontendAPIOverride = typeof env.frontendAPI === 'string' ? env.frontendAPI.trim() : '';
+      if (!publishableKey) {
+        showErr('Missing Clerk publishable key.');
+        return;
+      }
 
-    async function establishSession(accessToken) {
-      const res = await fetch('/dashboard/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken, next: nextParam }),
-        credentials: 'same-origin'
+      function frontendOrigin(pk, override) {
+        const o = String(override || '').trim().replace(/\/$/, '');
+        if (o) return o;
+        const parts = pk.split('_');
+        if (parts.length < 3) throw new Error('bad key shape');
+        const b64 = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = atob(b64);
+        const host = decoded.slice(0, -1);
+        return 'https://' + host;
+      }
+
+      function loadScript(src, attrs) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.crossOrigin = 'anonymous';
+          if (attrs) {
+            Object.keys(attrs).forEach(function (k) { s.setAttribute(k, attrs[k]); });
+          }
+          s.onload = resolve;
+          s.onerror = function () { reject(new Error('Failed to load ' + src)); };
+          document.head.appendChild(s);
+        });
+      }
+
+      let origin;
+      try {
+        origin = frontendOrigin(publishableKey, frontendAPIOverride);
+      } catch (e) {
+        showErr('Could not derive Clerk Frontend API URL. Set CLERK_FRONTEND_API in your server .env to the value from Clerk Dashboard → API keys → Frontend API.');
+        return;
+      }
+
+      try {
+        await loadScript(origin + '/npm/@clerk/ui@1/dist/ui.browser.js');
+        await loadScript(origin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js', {
+          'data-clerk-publishable-key': publishableKey
+        });
+      } catch (e) {
+        showErr((e && e.message) ? String(e.message) : 'Authentication scripts failed to load. Check your network and Clerk Frontend API URL.');
+        return;
+      }
+
+      try {
+        await Clerk.load({
+          ui: { ClerkUI: window.__internal_ClerkUICtor }
+        });
+      } catch (e) {
+        showErr((e && e.message) ? String(e.message) : 'Clerk failed to initialize.');
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const nextParam = params.get('next') || '';
+      if (params.get('signed_out') === '1' || params.get('signed_out') === 'true') {
+        if (Clerk.isSignedIn) {
+          await Clerk.signOut();
+        }
+        history.replaceState({}, '', '/dashboard');
+      }
+
+      let establishing = false;
+      let syncing = false;
+      let lastSyncedToken = null;
+
+      /** @returns {Promise<boolean>} true if redirecting to complete login */
+      async function establishSession(sessionJWT) {
+        if (establishing) return false;
+        establishing = true;
+        try {
+          const res = await fetch('/dashboard/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_token: sessionJWT, next: nextParam }),
+            credentials: 'same-origin'
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok) {
+            showErr(data.error || 'Could not start session');
+            return false;
+          }
+          const dest = typeof data.redirect === 'string' && data.redirect.startsWith('/') ? data.redirect : '/dashboard';
+          window.location.href = dest;
+          return true;
+        } finally {
+          establishing = false;
+        }
+      }
+
+      /** Syncs server cookie when token is new; returns true if navigating away after success. */
+      async function syncServerSessionIfNewToken(token) {
+        if (syncing) return false;
+        if (!token || token === lastSyncedToken) return false;
+        syncing = true;
+        try {
+          lastSyncedToken = token;
+          const ok = await establishSession(token);
+          if (!ok) {
+            lastSyncedToken = null;
+          }
+          return ok;
+        } finally {
+          syncing = false;
+        }
+      }
+
+      if (Clerk.isSignedIn && Clerk.session) {
+        const t = await Clerk.session.getToken();
+        if (t) {
+          const redirected = await syncServerSessionIfNewToken(t);
+          if (redirected) return;
+        }
+      }
+
+      Clerk.addListener(async function (em) {
+        if (!em.session) return;
+        const t = await em.session.getToken();
+        await syncServerSessionIfNewToken(t);
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showErr(data.error || 'Could not start session');
-        return;
+
+      const root = document.getElementById('clerk-signin-root');
+      if (!Clerk.isSignedIn) {
+        if (root) {
+          Clerk.mountSignIn(root);
+        } else {
+          console.error('ecomhub: missing #clerk-signin-root; cannot mount Clerk SignIn');
+          showErr('Sign-in UI is misconfigured (missing container).');
+        }
       }
-      const dest = typeof data.redirect === 'string' && data.redirect.startsWith('/') ? data.redirect : '/dashboard';
-      window.location.href = dest;
     }
 
-    document.getElementById('signin-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      showErr('');
-      const fd = new FormData(e.target);
-      const email = String(fd.get('email') || '').trim();
-      const password = String(fd.get('password') || '');
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        showErr(error.message);
-        return;
+    window.addEventListener('error', function (ev) {
+      var el = document.getElementById('auth-client-error');
+      if (!el || el.textContent) return;
+      var msg = (ev && ev.message) ? String(ev.message) : '';
+      if (msg) {
+        el.textContent = msg;
+        el.style.display = 'block';
       }
-      if (!data.session) {
-        showErr('No session returned');
-        return;
-      }
-      await establishSession(data.session.access_token);
     });
 
-    document.getElementById('signup-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      showErr('');
-      const fd = new FormData(e.target);
-      const email = String(fd.get('email') || '').trim();
-      const password = String(fd.get('password') || '');
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        showErr(error.message);
-        return;
+    main().catch(function (e) {
+      var el = document.getElementById('auth-client-error');
+      if (el) {
+        el.textContent = (e && e.message) ? String(e.message) : 'Authentication failed to start.';
+        el.style.display = 'block';
       }
-      if (!data.session) {
-        showErr('Check your email to confirm your account, then sign in here.');
-        return;
-      }
-      await establishSession(data.session.access_token);
     });
   </script>
   {{end}}
   <section>
     <h2>API quick reference</h2>
     <ul class="muted">
-      <li>Auth: Supabase sign-in on this page, then <code>GET /api/me</code> (cookie or <code>Authorization: Bearer &lt;access_token&gt;</code>)</li>
+      <li>Auth: Clerk sign-in on this page, then <code>GET /api/me</code> (cookie or <code>Authorization: Bearer &lt;session_token&gt;</code>)</li>
       <li><code>POST /api/stores</code>, <code>GET /api/stores</code></li>
       <li><code>POST /api/products</code> (JSON body includes <code>store_id</code>)</li>
       <li><code>GET /api/cart</code>, <code>POST /api/cart/add</code>, <code>POST /api/orders</code></li>

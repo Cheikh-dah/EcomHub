@@ -60,7 +60,7 @@ func (s *Server) apiLogout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// apiMe returns the internal user id after Supabase JWT resolution (sub → user_identities).
+// apiMe returns the internal user id after Clerk session JWT resolution (sub → user_identities, provider clerk).
 func (s *Server) apiMe(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {

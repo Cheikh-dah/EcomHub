@@ -15,11 +15,13 @@ import (
 	"ecomhub/internal/httpserver"
 	"ecomhub/internal/web"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	cfg := config.Load()
+	clerk.SetKey(cfg.ClerkSecretKey)
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}

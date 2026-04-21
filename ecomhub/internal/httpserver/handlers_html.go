@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"ecomhub/internal/auth"
+	"ecomhub/internal/config"
 	"ecomhub/internal/middleware"
 	"ecomhub/internal/models"
 
@@ -371,17 +372,17 @@ func safeInternalRedirectPath(next string) string {
 }
 
 type dashboardData struct {
-	LoggedIn       bool
-	Token          bool
-	Stores         []models.Store
-	Error          string
-	SupabasePublic template.JS
+	LoggedIn           bool
+	Token              bool
+	Stores             []models.Store
+	Error              string
+	ClerkBootstrapJSON template.JS // raw JSON for <script type="application/json"> (avoids broken JS parse in IDEs)
 }
 
-func (s *Server) dashboardSupabasePublicJSON() template.JS {
+func clerkBootstrapJSON(cfg config.Config) template.JS {
 	b, err := json.Marshal(map[string]string{
-		"url":     s.cfg.SupabaseURL,
-		"anonKey": s.cfg.SupabaseAnonKey,
+		"publishableKey": cfg.ClerkPublishableKey,
+		"frontendAPI":    cfg.ClerkFrontendAPI,
 	})
 	if err != nil {
 		return template.JS("{}")
@@ -391,24 +392,33 @@ func (s *Server) dashboardSupabasePublicJSON() template.JS {
 
 func (s *Server) dashboardSession(c *gin.Context) {
 	var body struct {
-		AccessToken string `json:"access_token"`
-		Next        string `json:"next"`
+		AccessToken  string `json:"access_token"`
+		SessionToken string `json:"session_token"`
+		Next         string `json:"next"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.AccessToken) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "access_token required"})
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+	tok := strings.TrimSpace(body.AccessToken)
+	if tok == "" {
+		tok = strings.TrimSpace(body.SessionToken)
+	}
+	if tok == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "access_token or session_token required"})
 		return
 	}
 	ctx := c.Request.Context()
-	sub, email, maxAge, err := auth.VerifySupabaseAccessToken(body.AccessToken, s.cfg.SupabaseJWTSecret)
+	clerkUserID, maxAge, err := auth.VerifyClerkSessionJWT(ctx, tok, s.cfg.ClerkAuthorizedParties)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 		return
 	}
-	if _, err := auth.ResolveSupabaseUser(ctx, s.pool, sub, email); err != nil {
+	if _, err := auth.ResolveClerkUser(ctx, s.pool, clerkUserID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not resolve user"})
 		return
 	}
-	setAuthCookie(c, body.AccessToken, s.cfg.Environment, maxAge)
+	setAuthCookie(c, tok, s.cfg.Environment, maxAge)
 	redirect := safeInternalRedirectPath(body.Next)
 	c.JSON(http.StatusOK, gin.H{"ok": true, "redirect": redirect})
 }
@@ -425,9 +435,15 @@ func (s *Server) dashboardGet(c *gin.Context) {
 		}
 	}
 	data := dashboardData{
-		LoggedIn:       ok,
-		Token:          ok,
-		SupabasePublic: s.dashboardSupabasePublicJSON(),
+		LoggedIn:           ok,
+		Token:              ok,
+		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
+	}
+	switch strings.TrimSpace(c.Query("err")) {
+	case "invalid_store":
+		data.Error = "Invalid store name or subdomain. Use letters, numbers, and hyphens only; do not start or end with a hyphen (max 63 characters). Subdomains are saved in lowercase."
+	case "taken":
+		data.Error = "That subdomain is already taken, or the store could not be saved. Pick a different subdomain."
 	}
 	if ok {
 		rows, err := s.pool.Query(c.Request.Context(),
@@ -450,14 +466,14 @@ func (s *Server) dashboardGet(c *gin.Context) {
 
 func (s *Server) dashboardLogout(c *gin.Context) {
 	clearAuthCookie(c, s.cfg.Environment)
-	c.Redirect(http.StatusSeeOther, "/dashboard")
+	c.Redirect(http.StatusSeeOther, "/dashboard?signed_out=1")
 }
 
 func (s *Server) dashboardErr(c *gin.Context, msg string) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", dashboardData{
-		Error:          msg,
-		SupabasePublic: s.dashboardSupabasePublicJSON(),
+		Error:              msg,
+		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
 	})
 }
 

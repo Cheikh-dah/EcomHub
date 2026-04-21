@@ -41,7 +41,7 @@ func (s *Server) Mount(r *gin.Engine) {
 		api.POST("/logout", s.apiLogout)
 
 		authd := api.Group("")
-		authd.Use(middleware.RequireAuth(s.pool, s.cfg.SupabaseJWTSecret))
+		authd.Use(middleware.RequireAuth(s.pool, s.cfg.ClerkAuthorizedParties))
 		{
 			authd.GET("/me", s.apiMe)
 			authd.GET("/stores", s.apiListStores)
@@ -63,12 +63,12 @@ func (s *Server) Mount(r *gin.Engine) {
 		}
 	}
 
-	r.GET("/dashboard", middleware.OptionalAuth(s.pool, s.cfg.SupabaseJWTSecret), s.dashboardGet)
+	r.GET("/dashboard", middleware.OptionalAuth(s.pool, s.cfg.ClerkAuthorizedParties), s.dashboardGet)
 	r.POST("/dashboard/session", s.dashboardSession)
 	r.POST("/dashboard/logout", s.dashboardLogout)
 
 	dashAuth := r.Group("/dashboard")
-	dashAuth.Use(middleware.RequireAuth(s.pool, s.cfg.SupabaseJWTSecret))
+	dashAuth.Use(middleware.RequireAuth(s.pool, s.cfg.ClerkAuthorizedParties))
 	dashAuth.POST("/stores", s.dashboardCreateStore)
 
 	sub := r.Group("/s/:subdomain")
@@ -78,7 +78,7 @@ func (s *Server) Mount(r *gin.Engine) {
 		sub.POST("/cart/add", s.storeCartAdd)
 		sub.POST("/cart/remove", s.storeCartRemove)
 		sub.GET("/cart", s.storeCartHTML)
-		sub.POST("/checkout", middleware.OptionalAuth(s.pool, s.cfg.SupabaseJWTSecret), s.storeCheckout)
+		sub.POST("/checkout", middleware.OptionalAuth(s.pool, s.cfg.ClerkAuthorizedParties), s.storeCheckout)
 	}
 }
 

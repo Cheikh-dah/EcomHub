@@ -11,44 +11,63 @@ import (
 )
 
 type Config struct {
-	// Environment is one of: development, staging, production (lowercase after load).
 	Environment string
 	HTTPPort    string
 	DatabaseURL string
-	// AppURL is the public base URL of this app (e.g. https://ecomhub.com). Optional until redirects or auth callbacks need it.
-	AppURL string
-	// BaseHost is the apex domain for subdomain resolution (e.g. "ecomhub.local" or "example.com").
-	// Empty disables host-based tenant resolution; use /s/{subdomain} paths only.
-	BaseHost string
+	AppURL      string
+	BaseHost    string
 
-	// SupabaseURL is the project URL (e.g. https://xxxx.supabase.co).
-	SupabaseURL string
-	// SupabaseJWTSecret is the JWT signing secret from Supabase Dashboard → Settings → API.
-	// Used to verify Supabase-issued user access tokens (not the service_role key).
-	SupabaseJWTSecret string
-	// SupabaseAnonKey is the public anon key (browser-safe) for the dashboard Supabase client.
-	SupabaseAnonKey string
-	// SupabaseServiceKey is optional; server-only when used.
-	SupabaseServiceKey string
+	// ClerkSecretKey is the Clerk secret key (sk_test_... / sk_live_...). Used for Backend API (JWKS, user lookup).
+	ClerkSecretKey string
+	// ClerkPublishableKey is the browser-safe key (pk_test_... / pk_live_...) for Clerk JS on the dashboard.
+	ClerkPublishableKey string
+	// ClerkFrontendAPI is the Clerk Frontend API origin, e.g. https://your-instance.clerk.accounts.dev
+	// (Dashboard → API keys → Frontend API URL). Optional if the dashboard derives it from the publishable key.
+	ClerkFrontendAPI string
+	// ClerkAuthorizedParties lists allowed `azp` origins for session JWTs (comma-separated in env).
+	// Empty disables azp checking (less strict; OK for some local setups).
+	ClerkAuthorizedParties []string
 }
 
 func Load() Config {
-	_ = godotenv.Load()
+	// Overload so values from .env replace existing process env (including empty strings).
+	// godotenv.Load would skip any key already set in the environment — on Windows a mistaken
+	// empty CLERK_SECRET_KEY in User/System env blocks the real key from .env.
+	_ = godotenv.Overload()
 
+	parties := parseCSV(os.Getenv("CLERK_AUTHORIZED_PARTIES"))
 	cfg := Config{
-		Environment:        strings.ToLower(getenv("ENVIRONMENT", "development")),
-		HTTPPort:           getenv("PORT", "8080"),
-		DatabaseURL:        strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		AppURL:             strings.TrimSpace(os.Getenv("APP_URL")),
-		BaseHost:           strings.TrimSpace(os.Getenv("BASE_HOST")),
-		SupabaseURL:        strings.TrimSpace(os.Getenv("SUPABASE_URL")),
-		SupabaseJWTSecret:  strings.TrimSpace(os.Getenv("SUPABASE_JWT_SECRET")),
-		SupabaseAnonKey:    strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY")),
-		SupabaseServiceKey: strings.TrimSpace(os.Getenv("SUPABASE_SERVICE_KEY")),
+		Environment:            strings.ToLower(getenv("ENVIRONMENT", "development")),
+		HTTPPort:               getenv("PORT", "8080"),
+		DatabaseURL:            strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		AppURL:                 strings.TrimSpace(os.Getenv("APP_URL")),
+		BaseHost:               strings.TrimSpace(os.Getenv("BASE_HOST")),
+		ClerkSecretKey:         strings.TrimSpace(os.Getenv("CLERK_SECRET_KEY")),
+		ClerkPublishableKey:    strings.TrimSpace(os.Getenv("CLERK_PUBLISHABLE_KEY")),
+		ClerkFrontendAPI:       strings.TrimSpace(strings.TrimRight(os.Getenv("CLERK_FRONTEND_API"), "/")),
+		ClerkAuthorizedParties: parties,
+	}
+
+	if len(cfg.ClerkAuthorizedParties) == 0 && cfg.AppURL != "" {
+		cfg.ClerkAuthorizedParties = append(cfg.ClerkAuthorizedParties, strings.TrimRight(cfg.AppURL, "/"))
 	}
 
 	validate(cfg)
 	return cfg
+}
+
+func parseCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func validate(cfg Config) {
@@ -72,27 +91,29 @@ func validate(cfg Config) {
 			log.Fatal("APP_URL must use https in production")
 		}
 	}
-	if cfg.SupabaseURL == "" {
-		log.Fatal("SUPABASE_URL is required (Supabase project URL, e.g. https://xxxx.supabase.co)")
+	if cfg.ClerkSecretKey == "" || len(cfg.ClerkSecretKey) < 20 {
+		log.Fatal("CLERK_SECRET_KEY is required (Clerk Dashboard → API keys → Secret key)")
 	}
-	u, err := url.Parse(cfg.SupabaseURL)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		log.Fatalf("SUPABASE_URL must be a valid URL with host: %q", cfg.SupabaseURL)
+	if !strings.HasPrefix(cfg.ClerkSecretKey, "sk_test_") && !strings.HasPrefix(cfg.ClerkSecretKey, "sk_live_") {
+		log.Fatal("CLERK_SECRET_KEY must start with sk_test_ or sk_live_")
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		log.Fatalf("SUPABASE_URL scheme must be http or https, got %q", u.Scheme)
+	if cfg.ClerkPublishableKey == "" || len(cfg.ClerkPublishableKey) < 20 {
+		log.Fatal("CLERK_PUBLISHABLE_KEY is required (Clerk Dashboard → API keys → Publishable key)")
 	}
-	if (cfg.Environment == "production" || cfg.Environment == "staging") && u.Scheme != "https" {
-		log.Fatal("SUPABASE_URL must use https when ENVIRONMENT is staging or production")
+	if !strings.HasPrefix(cfg.ClerkPublishableKey, "pk_test_") && !strings.HasPrefix(cfg.ClerkPublishableKey, "pk_live_") {
+		log.Fatal("CLERK_PUBLISHABLE_KEY must start with pk_test_ or pk_live_")
 	}
-	if cfg.SupabaseJWTSecret == "" || len(cfg.SupabaseJWTSecret) < 16 {
-		log.Fatal("SUPABASE_JWT_SECRET is required and must be at least 16 characters (JWT Secret from Supabase API settings — not the service_role key)")
-	}
-	if cfg.SupabaseAnonKey == "" || len(cfg.SupabaseAnonKey) < 20 {
-		log.Fatal("SUPABASE_ANON_KEY is required and must be at least 20 characters (public anon key for the dashboard Supabase client)")
-	}
-	if cfg.SupabaseServiceKey != "" && len(cfg.SupabaseServiceKey) < 20 {
-		log.Fatal("SUPABASE_SERVICE_KEY must be at least 20 characters when set")
+	if cfg.ClerkFrontendAPI != "" {
+		u, err := url.Parse(cfg.ClerkFrontendAPI)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			log.Fatalf("CLERK_FRONTEND_API must be a valid URL with host when set: %q", cfg.ClerkFrontendAPI)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			log.Fatalf("CLERK_FRONTEND_API scheme must be http or https, got %q", u.Scheme)
+		}
+		if (cfg.Environment == "production" || cfg.Environment == "staging") && u.Scheme != "https" {
+			log.Fatal("CLERK_FRONTEND_API must use https when ENVIRONMENT is staging or production")
+		}
 	}
 }
 

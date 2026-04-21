@@ -1,4 +1,4 @@
--- user_identities: map external auth (e.g. Supabase) to internal users
+-- user_identities: map external auth (e.g. Clerk) to internal users
 -- stores.status: public storefront only when 'active'
 
 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
