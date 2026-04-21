@@ -155,6 +155,23 @@ Protected API routes live under `/api/…` with `RequireAuth`. Dashboard POST `/
 
 ---
 
+## 10.1) Dashboard scope guidance
+
+Given the current codebase shape (Go SSR templates + backend route guards), treat these as separate workstreams:
+
+- **Now:** strengthen current dashboard SSR flows and auth/session reliability.
+- **Later:** introduce a separate client-side dashboard route architecture *only if needed*.
+
+This avoids mixing three high-risk changes at once:
+
+1. identity/session migration,
+2. frontend architecture migration,
+3. API envelope redesign.
+
+Keep backend middleware as security authority in both models.
+
+---
+
 ## 11) Host-based subdomains (SaaS routing)
 
 Current storefront URLs support `/s/{subdomain}`. To match production SaaS routing (`store.example.com`) add host-first resolution and keep path fallback during rollout.

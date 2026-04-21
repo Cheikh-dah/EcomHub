@@ -215,4 +215,30 @@ Cart HTML, `resolveCartLines`, and `placeOrder` already use **batched** `SELECT 
 
 ---
 
+## 11) Execution order (now vs later)
+
+Use this when deciding what to build next without over-rotating architecture.
+
+### Build now (fits current repo)
+
+- Stabilize Clerk auth/session path end-to-end (`/dashboard`, `/dashboard/session`, `/api/me`, logout).
+- Keep dashboard SSR-first and improve existing owner workflows (store + products CRUD).
+- Ship read-only orders listing only if backed by current endpoints/rules.
+- Keep storefront path fallback `/s/{subdomain}` as canonical until host-first routing is fully wired.
+
+### Build later (after stable MVP usage)
+
+- Host-first tenant routing (`{store}.{BASE_HOST}`) + wildcard DNS/TLS in deployment.
+- Dashboard architecture expansion (separate client-side route system) only if SSR becomes a bottleneck.
+- Global API error envelope migration (`code/message/details`) as a deliberate cross-cutting change.
+- Advanced merchant modules (order status transitions, analytics, payouts, reviews).
+
+### Guardrails
+
+- Backend remains authorization authority; frontend guards are UX only.
+- Do not couple “quick metrics” to fake placeholders — each card must map to a real endpoint/query.
+- Avoid combining auth migration + UI architecture rewrite + contract redesign in one sprint.
+
+---
+
 *Principle to remember:* **correct tenancy + schema beats premature infra.** Scaling gets easier when every request has an explicit `store_id` and hub reads are a deliberate layer.
