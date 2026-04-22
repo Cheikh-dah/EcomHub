@@ -26,7 +26,7 @@
     <h3>Create store</h3>
     <form method="post" action="/dashboard/stores" class="stack-form">
       <label>Name <input name="name" required></label>
-      <label>Subdomain <input id="dashboard-store-subdomain" name="subdomain" maxlength="63" pattern="[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" required placeholder="my-shop" title="Letters, numbers, hyphens; no leading or trailing hyphen; max 63 characters. Lowercased as you type to match how it is stored."></label>
+      <label>Address <input id="dashboard-store-subdomain" name="subdomain" maxlength="63" pattern="[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" required placeholder="my-shop" title="Letters, numbers, hyphens; no leading or trailing hyphen; max 63 characters. Spaces become hyphens, and text is lowercased as you type."></label>
       <label>Description <textarea name="description"></textarea></label>
       <button type="submit">Create store</button>
     </form>
@@ -38,7 +38,7 @@
         var el = document.getElementById('dashboard-store-subdomain');
         if (!el) return;
         el.addEventListener('input', function () {
-          var v = el.value.toLowerCase();
+          var v = el.value.toLowerCase().replace(/\s+/g, '-');
           if (el.value !== v) el.value = v;
         });
       })();
