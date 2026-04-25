@@ -3,6 +3,7 @@
 Quick reference: evolve a **working monolith** into a **multi-tenant hub** without premature complexity.
 
 **Auth (Clerk + Go + cookie bridge):** see [AUTH-BRIDGE.md](./AUTH-BRIDGE.md) for env vars, endpoints, dashboard JS lifecycle, and production checks.
+**REST API endpoints and payloads:** see [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
 
 ---
 

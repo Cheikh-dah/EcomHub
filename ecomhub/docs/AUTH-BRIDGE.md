@@ -3,6 +3,7 @@
 This document is the **single reference** for how authentication works today: identity (Clerk), the **session bridge** (browser ↔ server), and **backend authority** (JWT verification + Postgres).
 
 For product and scaling context, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHEATSHEETS.md).
+For endpoint-by-endpoint request/response examples, see [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
 
 ---
 
