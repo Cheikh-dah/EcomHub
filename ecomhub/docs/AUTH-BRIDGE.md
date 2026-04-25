@@ -7,6 +7,14 @@ For endpoint-by-endpoint request/response examples, see [REST-API-REFERENCE.md](
 
 ---
 
+## Documentation Scope
+
+- This file is the **source of truth** for Clerk/session bridge behavior and auth verification internals.
+- If token verification logic, cookie/session bridging, or auth middleware behavior changes, update this file in the same PR.
+- Keep endpoint payload contracts in `REST-API-REFERENCE.md`.
+
+---
+
 ## 1) Three layers
 
 ```text

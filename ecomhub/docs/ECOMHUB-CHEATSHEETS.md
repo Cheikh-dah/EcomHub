@@ -7,6 +7,14 @@ Quick reference: evolve a **working monolith** into a **multi-tenant hub** witho
 
 ---
 
+## Documentation Scope
+
+- This file is the **source of truth** for MVP scope, architecture stages, and implementation priorities.
+- Keep this doc high-level; avoid duplicating endpoint payload details from `REST-API-REFERENCE.md`.
+- If roadmap/phase guidance changes, update this file in the same PR.
+
+---
+
 ## 1) Evolution at a glance
 
 | Phase | You add | Stack shape |
@@ -174,7 +182,7 @@ Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + an
 | **Stores** | `POST /api/stores`, `GET /api/stores` |
 | **Products** | `POST /api/products`, `GET /api/products`, `PUT /api/products/{id}`, `DELETE /api/products/{id}` |
 | **Orders** | `POST /api/orders`, `GET /api/orders` |
-| **Public** | `GET /s/{subdomain}`, `GET /s/{subdomain}/products`, … |
+| **Public** | `GET /s/{subdomain}`, `GET /s/{subdomain}/products/{id}`, … |
 | **Hub** | `GET /products`, `GET /stores`, `GET /search?q=` |
 
 *(Adjust paths to match your router; keep **tenant** vs **hub** routes mentally separate.)*

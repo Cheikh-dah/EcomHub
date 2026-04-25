@@ -7,9 +7,27 @@ For product and architecture context, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHE
 
 ---
 
+## Documentation Scope
+
+- This file is the **source of truth** for REST request/response contracts and status codes.
+- If an endpoint path, method, payload, auth requirement, or response changes, update this file in the same PR.
+- Keep architecture decisions in `ECOMHUB-CHEATSHEETS.md` and auth internals in `AUTH-BRIDGE.md`.
+
+---
+
 ## Base URL
 
 - Local development: `http://localhost:8080`
+
+---
+
+## Auth Quickstart (Local)
+
+1. Sign in from `http://localhost:8080/dashboard`.
+2. Verify auth is working:
+   - browser: `GET /api/me` with `credentials: "include"`, or
+   - terminal: `GET /api/me` with `Authorization: Bearer <token>`.
+3. Call protected endpoints only after `/api/me` returns `200`.
 
 ---
 
@@ -51,6 +69,19 @@ Common values:
 - `forbidden`
 - `not found`
 - `invalid body`
+
+---
+
+## Common Status Codes
+
+- `200 OK`: successful read/update/delete.
+- `201 Created`: resource created successfully.
+- `400 Bad Request`: invalid query/body/id format.
+- `401 Unauthorized`: missing or invalid token/cookie.
+- `403 Forbidden`: authenticated user does not own target store/resource.
+- `404 Not Found`: resource id does not exist.
+- `409 Conflict`: unique constraint conflict (for example, duplicate subdomain).
+- `500 Internal Server Error`: unexpected server/database error.
 
 ---
 
@@ -378,7 +409,69 @@ These are useful for manual product/store verification:
 
 ---
 
+## Product CRUD Examples
+
+### Browser console (cookie auth)
+
+```js
+const storeId = 11;
+const created = await fetch('/api/products', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    store_id: storeId,
+    name: 'CRUD Test Product',
+    description: 'Initial',
+    price: 12.5,
+    stock: 7,
+    image_url: ''
+  })
+}).then(r => r.json());
+
+const productId = created.id;
+
+await fetch(`/api/products/${productId}`, {
+  method: 'PUT',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'CRUD Test Product (Edited)', price: 15.99, stock: 4 })
+});
+
+await fetch(`/api/products/${productId}`, { method: 'DELETE', credentials: 'include' });
+```
+
+### PowerShell (Bearer auth)
+
+```powershell
+$base = "http://localhost:8080"
+$token = "PASTE_SESSION_TOKEN"
+$auth = @{ Authorization = "Bearer $token" }
+
+$created = Invoke-RestMethod -Uri "$base/api/products" -Method Post `
+  -Headers ($auth + @{ "Content-Type" = "application/json" }) `
+  -Body (@{
+    store_id    = 11
+    name        = "CRUD Test Product"
+    description = "Initial"
+    price       = 12.50
+    stock       = 7
+    image_url   = ""
+  } | ConvertTo-Json -Compress)
+
+$productId = $created.id
+
+Invoke-RestMethod -Uri "$base/api/products/$productId" -Method Put `
+  -Headers ($auth + @{ "Content-Type" = "application/json" }) `
+  -Body (@{ name = "CRUD Test Product (Edited)"; price = 15.99; stock = 4 } | ConvertTo-Json -Compress)
+
+Invoke-RestMethod -Uri "$base/api/products/$productId" -Method Delete -Headers $auth
+```
+
+---
+
 ## Notes
 
 - Token and cookie issues are the most common local-dev failures; see troubleshooting in [AUTH-BRIDGE.md](./AUTH-BRIDGE.md).
 - API currently uses a simple `{"error":"..."}` contract rather than a versioned error envelope.
+- Avoid sharing live JWTs in chat, screenshots, or logs; use short-lived local tokens and refresh after debugging.
