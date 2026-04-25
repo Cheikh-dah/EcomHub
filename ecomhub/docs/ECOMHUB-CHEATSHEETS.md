@@ -250,4 +250,31 @@ Use this when deciding what to build next without over-rotating architecture.
 
 ---
 
+## 12) Product direction (current state -> next)
+
+### Vision
+
+Make EcomHub the easiest way for a merchant to launch and run a branded storefront, starting with a reliable core and expanding only when demand is proven.
+
+### Priority order (next 1-2 sprints)
+
+1. **Merchant activation:** reduce time from sign-in to first live product.
+2. **Reliability:** lock in auth/session and product/order API behavior with repeatable tests.
+3. **Theme-ready foundation:** add minimal per-store visual settings (color/logo/layout flag), not a full page builder.
+4. **Demand-driven expansion:** only build advanced customization/workflows after repeated merchant requests.
+
+### Success metrics
+
+- **Time to first product:** median time from first sign-in to successful `POST /api/products`.
+- **Activation rate:** percent of new merchants who publish at least one product within 24 hours.
+- **Core API reliability:** success rate for store/product CRUD and checkout endpoints.
+
+### Non-goals for current MVP stage
+
+- Drag-and-drop storefront builder.
+- Full CMS/plugin system.
+- Large frontend architecture rewrite without usage evidence.
+
+---
+
 *Principle to remember:* **correct tenancy + schema beats premature infra.** Scaling gets easier when every request has an explicit `store_id` and hub reads are a deliberate layer.
