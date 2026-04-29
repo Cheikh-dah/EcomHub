@@ -1,0 +1,214 @@
+{{define "theme_editor"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Theme Editor · {{.Store.Name}} · EcomHub</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <p class="crumb"><a href="/dashboard">&larr; Dashboard</a></p>
+  <h1>Theme Editor</h1>
+  <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
+
+  <div class="theme-editor">
+    <section class="theme-controls stack-form">
+      <label>
+        Primary color
+        <div class="color-row">
+          <input type="color" id="te-primary" value="{{.Theme.PrimaryColor}}">
+          <input type="text" id="te-primary-hex" class="hex-input" value="{{.Theme.PrimaryColor}}" maxlength="7" placeholder="#1d9bf0">
+        </div>
+      </label>
+
+      <label>
+        Accent color
+        <div class="color-row">
+          <input type="color" id="te-accent" value="{{.Theme.AccentColor}}">
+          <input type="text" id="te-accent-hex" class="hex-input" value="{{.Theme.AccentColor}}" maxlength="7" placeholder="#00ba7c">
+        </div>
+      </label>
+
+      <label>
+        Logo URL
+        <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
+      </label>
+
+      <label>Layout preset</label>
+      <div class="layout-toggle">
+        <label class="toggle-opt">
+          <input type="radio" name="layout_preset" value="default" {{if ne .Theme.LayoutPreset "compact"}}checked{{end}}>
+          Default
+        </label>
+        <label class="toggle-opt">
+          <input type="radio" name="layout_preset" value="compact" {{if eq .Theme.LayoutPreset "compact"}}checked{{end}}>
+          Compact
+        </label>
+      </div>
+
+      <div class="theme-actions">
+        <button id="te-save">Save theme</button>
+        <span id="te-status" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="theme-preview" id="te-preview">
+      <p class="theme-preview-label">Preview</p>
+
+      <div class="theme-preview-header">
+        <img id="te-preview-logo" src="" alt="" class="theme-preview-logo">
+        <span>{{.Store.Name}}</span>
+      </div>
+
+      <div class="theme-preview-card {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}" id="te-preview-card">
+        <div class="preview-img-placeholder"></div>
+        <div class="preview-card-body">
+          <p class="preview-product-name">Sample product</p>
+          <p class="preview-product-price">$29.00</p>
+          <button class="theme-preview-button" type="button">Add to cart</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+{{template "footer" .}}
+
+<script>
+(function () {
+  var storeID = {{.Store.ID}};
+  var elPrimary = document.getElementById('te-primary');
+  var elPrimaryHex = document.getElementById('te-primary-hex');
+  var elAccent = document.getElementById('te-accent');
+  var elAccentHex = document.getElementById('te-accent-hex');
+  var elLogo = document.getElementById('te-logo');
+  var elSave = document.getElementById('te-save');
+  var elStatus = document.getElementById('te-status');
+  var elPreview = document.getElementById('te-preview');
+  var elPreviewLogo = document.getElementById('te-preview-logo');
+  var elPreviewCard = document.getElementById('te-preview-card');
+  var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
+
+  function isHex(v) {
+    return /^#[0-9a-fA-F]{6}$/.test(v);
+  }
+
+  function selectedLayout() {
+    for (var i = 0; i < layoutRadios.length; i++) {
+      if (layoutRadios[i].checked) return layoutRadios[i].value;
+    }
+    return 'default';
+  }
+
+  function applyPreview() {
+    var primary = elPrimaryHex.value.trim();
+    var accent = elAccentHex.value.trim();
+    var logo = elLogo.value.trim();
+
+    elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : '#1d9bf0');
+    elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : '#00ba7c');
+
+    if (logo) {
+      elPreviewLogo.src = logo;
+      elPreviewLogo.style.display = 'block';
+    } else {
+      elPreviewLogo.removeAttribute('src');
+      elPreviewLogo.style.display = 'none';
+    }
+
+    if (selectedLayout() === 'compact') {
+      elPreviewCard.classList.add('compact');
+    } else {
+      elPreviewCard.classList.remove('compact');
+    }
+  }
+
+  function setStatus(msg, isErr) {
+    elStatus.textContent = msg;
+    elStatus.className = isErr ? 'error' : 'muted';
+  }
+
+  elPrimary.addEventListener('input', function () {
+    elPrimaryHex.value = elPrimary.value;
+    applyPreview();
+  });
+  elPrimaryHex.addEventListener('input', function () {
+    if (isHex(elPrimaryHex.value)) elPrimary.value = elPrimaryHex.value;
+    applyPreview();
+  });
+
+  elAccent.addEventListener('input', function () {
+    elAccentHex.value = elAccent.value;
+    applyPreview();
+  });
+  elAccentHex.addEventListener('input', function () {
+    if (isHex(elAccentHex.value)) elAccent.value = elAccentHex.value;
+    applyPreview();
+  });
+
+  elLogo.addEventListener('input', applyPreview);
+  Array.prototype.forEach.call(layoutRadios, function (radio) {
+    radio.addEventListener('change', applyPreview);
+  });
+
+  elSave.addEventListener('click', function () {
+    var primary = elPrimaryHex.value.trim();
+    var accent = elAccentHex.value.trim();
+    var logo = elLogo.value.trim();
+
+    if (!isHex(primary)) {
+      setStatus('Primary color must be a valid hex value.', true);
+      return;
+    }
+    if (!isHex(accent)) {
+      setStatus('Accent color must be a valid hex value.', true);
+      return;
+    }
+    if (logo && !/^https?:\/\/.+/.test(logo)) {
+      setStatus('Logo URL must start with http:// or https://.', true);
+      return;
+    }
+
+    elSave.disabled = true;
+    setStatus('Saving...', false);
+
+    fetch('/api/stores/' + storeID + '/theme', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        primary_color: primary,
+        accent_color: accent,
+        logo_url: logo,
+        layout_preset: selectedLayout()
+      })
+    })
+    .then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          throw new Error(body.error || ('Save failed (' + res.status + ')'));
+        });
+      }
+      return res.json();
+    })
+    .then(function () {
+      setStatus('Saved!', false);
+      window.setTimeout(function () { setStatus('', false); }, 3000);
+    })
+    .catch(function (err) {
+      setStatus(err.message || 'Save failed', true);
+    })
+    .finally(function () {
+      elSave.disabled = false;
+    });
+  });
+
+  applyPreview();
+})();
+</script>
+  {{template "clerk_sync" .}}
+</body>
+</html>
+{{end}}

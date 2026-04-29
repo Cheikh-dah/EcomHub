@@ -1,0 +1,24 @@
+{{define "home"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EcomHub</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{template "header" .}}
+<main class="container">
+  <h1>EcomHub</h1>
+  <p class="muted">Multi-tenant storefronts and a lightweight marketplace hub.</p>
+  
+  <section class="hub-cta">
+    <a href="/products" class="btn">Browse Products</a>
+    <a href="/stores" class="btn">Explore Stores</a>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

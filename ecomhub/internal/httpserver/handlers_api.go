@@ -2,8 +2,10 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	neturl "net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 )
 
 var subdomainRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+var hexColorRe = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 type storeBody struct {
 	Name        string `json:"name" binding:"required"`
@@ -40,6 +43,20 @@ type productUpdateBody struct {
 	Price       *float64 `json:"price"`
 	Stock       *int     `json:"stock"`
 	ImageURL    *string  `json:"image_url"`
+}
+
+type storeThemeBody struct {
+	PrimaryColor string `json:"primary_color"`
+	AccentColor  string `json:"accent_color"`
+	LogoURL      string `json:"logo_url"`
+	LayoutPreset string `json:"layout_preset"`
+}
+
+type storeThemeUpdateBody struct {
+	PrimaryColor *string `json:"primary_color"`
+	AccentColor  *string `json:"accent_color"`
+	LogoURL      *string `json:"logo_url"`
+	LayoutPreset *string `json:"layout_preset"`
 }
 
 type cartAddBody struct {
@@ -161,6 +178,202 @@ func (s *Server) assertStoreOwner(ctx context.Context, userID uuid.UUID, storeID
 	var ok bool
 	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM stores WHERE id = $1 AND user_id = $2)`, storeID, userID).Scan(&ok)
 	return err == nil && ok
+}
+
+func defaultStoreTheme() models.StoreTheme {
+	return models.StoreTheme{
+		PrimaryColor: "#1d9bf0",
+		AccentColor:  "#00ba7c",
+		LogoURL:      "",
+		LayoutPreset: "default",
+	}
+}
+
+func normalizeColor(v string, fallback string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(v))
+	if s == "" {
+		return fallback, nil
+	}
+	if !hexColorRe.MatchString(s) {
+		return "", errors.New("invalid color")
+	}
+	return s, nil
+}
+
+func normalizeLayoutPreset(v string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(v))
+	if s == "" {
+		return "default", nil
+	}
+	switch s {
+	case "default", "compact":
+		return s, nil
+	default:
+		return "", errors.New("invalid layout_preset")
+	}
+}
+
+func normalizeLogoURL(v string) (string, error) {
+	s := strings.TrimSpace(v)
+	if s == "" {
+		return "", nil
+	}
+	u, err := neturl.Parse(s)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", errors.New("invalid logo_url")
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return "", errors.New("invalid logo_url")
+	}
+	return s, nil
+}
+
+func normalizeStoreTheme(in storeThemeBody) (models.StoreTheme, error) {
+	d := defaultStoreTheme()
+	var out models.StoreTheme
+	var err error
+
+	out.PrimaryColor, err = normalizeColor(in.PrimaryColor, d.PrimaryColor)
+	if err != nil {
+		return out, err
+	}
+	out.AccentColor, err = normalizeColor(in.AccentColor, d.AccentColor)
+	if err != nil {
+		return out, err
+	}
+	out.LogoURL, err = normalizeLogoURL(in.LogoURL)
+	if err != nil {
+		return out, err
+	}
+	out.LayoutPreset, err = normalizeLayoutPreset(in.LayoutPreset)
+	if err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+func normalizeStoreThemePatch(curr models.StoreTheme, patch storeThemeUpdateBody) (models.StoreTheme, error) {
+	out := curr
+	var err error
+	if patch.PrimaryColor != nil {
+		out.PrimaryColor, err = normalizeColor(*patch.PrimaryColor, curr.PrimaryColor)
+		if err != nil {
+			return out, err
+		}
+	}
+	if patch.AccentColor != nil {
+		out.AccentColor, err = normalizeColor(*patch.AccentColor, curr.AccentColor)
+		if err != nil {
+			return out, err
+		}
+	}
+	if patch.LogoURL != nil {
+		out.LogoURL, err = normalizeLogoURL(*patch.LogoURL)
+		if err != nil {
+			return out, err
+		}
+	}
+	if patch.LayoutPreset != nil {
+		out.LayoutPreset, err = normalizeLayoutPreset(*patch.LayoutPreset)
+		if err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+func (s *Server) loadStoreThemeByID(ctx context.Context, storeID int64) (models.StoreTheme, error) {
+	theme := defaultStoreTheme()
+	var raw []byte
+	err := s.pool.QueryRow(ctx, `SELECT theme_config FROM stores WHERE id = $1`, storeID).Scan(&raw)
+	if err != nil {
+		return theme, err
+	}
+	if len(raw) == 0 {
+		return theme, nil
+	}
+	var persisted storeThemeBody
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		return theme, nil
+	}
+	norm, err := normalizeStoreTheme(persisted)
+	if err != nil {
+		return theme, nil
+	}
+	return norm, nil
+}
+
+func (s *Server) apiGetStoreTheme(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	uid, _ := middleware.UserID(c)
+	if !s.assertStoreOwner(c.Request.Context(), uid, id) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	theme, err := s.loadStoreThemeByID(c.Request.Context(), id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "query failed"})
+		return
+	}
+	c.JSON(http.StatusOK, theme)
+}
+
+func (s *Server) apiUpdateStoreTheme(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	uid, _ := middleware.UserID(c)
+	if !s.assertStoreOwner(c.Request.Context(), uid, id) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	current, err := s.loadStoreThemeByID(c.Request.Context(), id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "query failed"})
+		return
+	}
+	var body storeThemeUpdateBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	updated, err := normalizeStoreThemePatch(current, body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	payload, err := json.Marshal(updated)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "encode failed"})
+		return
+	}
+	cmd, err := s.pool.Exec(c.Request.Context(),
+		`UPDATE stores SET theme_config = $1::jsonb WHERE id = $2 AND user_id = $3`,
+		payload, id, uid,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+	if cmd.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
 }
 
 func (s *Server) apiListProducts(c *gin.Context) {

@@ -113,6 +113,18 @@ Protected API routes live under `/api/…` with `RequireAuth`. Dashboard POST `/
 
 - After server clears the cookie, `?signed_out=1` triggers `Clerk.signOut()` before mounting SignIn so a lingering Clerk session does not immediately re-POST `/dashboard/session`.
 
+**Background Session Sync (`clerk_sync` partial)**
+
+To prevent session timeout while a merchant is active on dashboard sub-pages (like the Theme Editor), a shared `clerk_sync` partial is used:
+- **Location**: `internal/web/templates/layout.html` (`{{define "clerk_sync"}}`)
+- **Behavior**:
+  1. Loads Clerk JS if not already present.
+  2. Handshakes with Clerk to confirm the session.
+  3. Sets up a `Clerk.addListener` (or `setInterval` fallback) to watch for token updates.
+  4. Periodically POSTs the latest session JWT to `/dashboard/session` to keep the server's `auth_token` cookie fresh.
+  5. Automatically mounts the Sign-In UI if a `#clerk-signin-root` element is present (idempotent).
+- **Usage**: Included at the bottom of `dashboard.html` and `theme_editor.html` via `{{template "clerk_sync" .}}`.
+
 ---
 
 ## 6) Database

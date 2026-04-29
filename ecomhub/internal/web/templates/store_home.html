@@ -1,4 +1,5 @@
 {{define "store_home"}}
+<!-- Theme test -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,13 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Store.Name}} · Store</title>
   <link rel="stylesheet" href="/static/style.css">
+  <style>
+    :root {
+      --accent: {{.Theme.AccentColor}};
+    }
+  </style>
 </head>
 <body>
 {{template "header" .}}
 <main class="container">
   <h1>{{.Store.Name}}</h1>
   <p class="lead">{{.Store.Description}}</p>
-  <ul class="grid">
+  <ul class="grid {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}">
     {{range .Products}}
     <li class="card">
       <a href="/s/{{$.Store.Subdomain}}/products/{{.ID}}">{{.Name}}</a>

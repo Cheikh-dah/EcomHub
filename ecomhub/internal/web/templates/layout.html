@@ -1,6 +1,15 @@
 {{define "header"}}
-<header class="site-header">
-  <a class="brand" href="/">EcomHub</a>
+<header class="site-header {{with .Theme}}{{if .PrimaryColor}}themed{{end}}{{end}}" {{with .Theme}}{{if .PrimaryColor}}style="background: {{.PrimaryColor}}"{{end}}{{end}}>
+  <a class="brand" href="{{if and .Store .Store.Subdomain}}/s/{{.Store.Subdomain}}{{else}}/{{end}}">
+    {{$name := "EcomHub"}}
+    {{if and .Store .Store.Name}}{{$name = .Store.Name}}{{end}}
+    
+    {{if and .Theme .Theme.LogoURL}}
+      <img src="{{.Theme.LogoURL}}" alt="{{$name}}">
+    {{else}}
+      {{$name}}
+    {{end}}
+  </a>
   <nav>
     <a href="/products">All products</a>
     <a href="/stores">Stores</a>
@@ -12,4 +21,62 @@
 
 {{define "footer"}}
 <footer class="site-footer">EcomHub MVP</footer>
+{{end}}
+
+{{define "clerk_sync"}}
+  <script type="application/json" id="ecomhub-clerk-bootstrap">{{.ClerkBootstrapJSON}}</script>
+  <script type="module">
+    async function main() {
+      const boot = document.getElementById('ecomhub-clerk-bootstrap');
+      const raw = (boot && boot.textContent) ? boot.textContent.trim() : '';
+      const env = raw ? JSON.parse(raw) : {};
+      const pk = typeof env.publishableKey === 'string' ? env.publishableKey.trim() : '';
+      if (!pk) return;
+
+      function frontendOrigin(pk, override) {
+        if (override) return override.trim().replace(/\/$/, '');
+        const parts = pk.split('_');
+        if (parts.length < 3) return '';
+        return 'https://' + atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')).slice(0, -1);
+      }
+
+      function loadScript(src, attrs) {
+        return new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+          if (attrs) Object.keys(attrs).forEach(k => s.setAttribute(k, attrs[k]));
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+
+      const origin = frontendOrigin(pk, env.frontendAPI);
+      if (!origin) return;
+
+      try {
+        await loadScript(origin + '/npm/@clerk/ui@1/dist/ui.browser.js');
+        await loadScript(origin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js', { 'data-clerk-publishable-key': pk });
+        await Clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
+
+        Clerk.addListener(async (em) => {
+          if (!em.session) return;
+          const t = await em.session.getToken();
+          if (t) {
+            await fetch('/dashboard/session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_token: t }),
+              credentials: 'same-origin'
+            });
+          }
+        });
+
+        const root = document.getElementById('clerk-signin-root');
+        if (!Clerk.isSignedIn && root) {
+          Clerk.mountSignIn(root);
+        }
+      } catch (e) { console.error('Clerk sync failed:', e); }
+    }
+    main();
+  </script>
 {{end}}

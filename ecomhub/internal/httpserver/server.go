@@ -4,6 +4,7 @@ import (
 	"context"
 	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -47,6 +48,8 @@ func (s *Server) Mount(r *gin.Engine) {
 			authd.GET("/stores", s.apiListStores)
 			authd.POST("/stores", s.apiCreateStore)
 			authd.PUT("/stores/:id", s.apiUpdateStore)
+			authd.GET("/stores/:id/theme", s.apiGetStoreTheme)
+			authd.PUT("/stores/:id/theme", s.apiUpdateStoreTheme)
 
 			authd.GET("/products", s.apiListProducts)
 			authd.POST("/products", s.apiCreateProduct)
@@ -68,8 +71,9 @@ func (s *Server) Mount(r *gin.Engine) {
 	r.POST("/dashboard/logout", s.dashboardLogout)
 
 	dashAuth := r.Group("/dashboard")
-	dashAuth.Use(middleware.RequireAuth(s.pool, s.cfg.ClerkAuthorizedParties))
+	dashAuth.Use(middleware.RequireAuthRedirect(s.pool, s.cfg.ClerkAuthorizedParties))
 	dashAuth.POST("/stores", s.dashboardCreateStore)
+	dashAuth.GET("/stores/:id/theme", s.dashboardStoreThemeGet)
 
 	sub := r.Group("/s/:subdomain")
 	{
@@ -94,10 +98,10 @@ func (s *Server) health(c *gin.Context) {
 
 func (s *Server) home(c *gin.Context) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	c.String(http.StatusOK, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>EcomHub</title><link rel="stylesheet" href="/static/style.css"></head><body>`+
-		`<header class="site-header"><a class="brand" href="/">EcomHub</a><nav>`+
-		`<a href="/products">Products</a> <a href="/stores">Stores</a> <a href="/search">Search</a> <a href="/dashboard">Dashboard</a>`+
-		`</nav></header><main class="container"><h1>EcomHub</h1><p class="muted">Multi-tenant storefronts and a lightweight marketplace hub.</p></main></body></html>`)
+	err := s.tmpl.ExecuteTemplate(c.Writer, "home", gin.H{})
+	if err != nil {
+		log.Printf("home render error: %v", err)
+	}
 }
 
 func normalizeSubdomain(s string) string {

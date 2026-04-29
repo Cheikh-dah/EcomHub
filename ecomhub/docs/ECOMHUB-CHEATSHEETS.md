@@ -277,4 +277,40 @@ Make EcomHub the easiest way for a merchant to launch and run a branded storefro
 
 ---
 
+## 13) Store UI customization v1 plan
+
+### Goal
+
+Let merchants safely customize a storefront's basic visual identity without introducing a page builder or frontend rewrite.
+
+### Scope for v1
+
+- `primary_color`
+- `accent_color`
+- `logo_url`
+- `layout_preset` (`default` or `compact`)
+
+### Implementation order
+
+1. **Backend core:** persist `theme_config`, validate values, expose authenticated read/update endpoints.
+2. **Dashboard editor:** add a merchant-only theme editor page under `/dashboard/stores/{id}/theme`.
+3. **Live preview:** use vanilla JS + CSS variables for instant preview with no build step.
+4. **Storefront application:** apply saved theme values to storefront templates once the editor workflow is stable.
+
+### Technical approach
+
+- Keep dashboard pages SSR-first with templates in `internal/web/templates`.
+- Reuse backend auth middleware and owned-store authorization helpers.
+- Save changes through the existing REST API instead of creating a separate HTML save path.
+- Keep customization config-driven; do not allow arbitrary merchant CSS or HTML.
+
+### Guardrails
+
+- Use safe defaults for stores with no theme data.
+- Validate colors, URLs, and layout preset values server-side.
+- Keep theme editor UI and storefront theme application as separate reviewable changes when possible.
+- Treat drag-and-drop builders, arbitrary markup, and advanced layout systems as post-MVP work.
+
+---
+
 *Principle to remember:* **correct tenancy + schema beats premature infra.** Scaling gets easier when every request has an explicit `store_id` and hub reads are a deliberate layer.

@@ -178,6 +178,58 @@ Common values:
 
 ---
 
+### Store Theme
+
+#### `GET /api/stores/:id/theme`
+
+- Auth: optional
+- Response: `200 OK` — theme configuration for the store
+
+```json
+{
+  "primary_color": "#1d9bf0",
+  "accent_color": "#00ba7c",
+  "logo_url": "https://example.com/logo.png",
+  "layout_preset": "default"
+}
+```
+
+- Note: returns default theme if no custom theme set
+
+#### `PUT /api/stores/:id/theme`
+
+- Auth: required
+- Body: (all fields optional — patch semantics)
+
+```json
+{
+  "primary_color": "#1d9bf0",
+  "accent_color": "#00ba7c",
+  "logo_url": "https://example.com/logo.png",
+  "layout_preset": "default"
+}
+```
+
+- Validation:
+  - `primary_color` must be valid hex (#RRGGBB) or omitted
+  - `accent_color` must be valid hex or omitted
+  - `logo_url` must be absolute HTTP(S) URL or empty string, omitted
+  - `layout_preset` must be `default` or `compact` or omitted
+- Authorization:
+  - caller must own the target store (returns `403 Forbidden` if not)
+- Response: `200 OK` — full updated theme
+
+```json
+{
+  "primary_color": "#1d9bf0",
+  "accent_color": "#00ba7c",
+  "logo_url": "https://example.com/logo.png",
+  "layout_preset": "default"
+}
+```
+
+---
+
 ### Products
 
 #### `GET /api/products?store_id=<id>`

@@ -23,6 +23,13 @@ type Store struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type StoreTheme struct {
+	PrimaryColor string `json:"primary_color"`
+	AccentColor  string `json:"accent_color"`
+	LogoURL      string `json:"logo_url,omitempty"`
+	LayoutPreset string `json:"layout_preset"`
+}
+
 // UserIdentity maps an external auth provider subject to an internal user.
 type UserIdentity struct {
 	ID              uuid.UUID `json:"id"`

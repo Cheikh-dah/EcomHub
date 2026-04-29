@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"ecomhub/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -32,6 +34,16 @@ type cartLineView struct {
 	Name      string
 	Quantity  int
 	LineTotal float64
+}
+
+func (s *Server) loadOwnedStore(ctx context.Context, userID uuid.UUID, storeID int64) (models.Store, error) {
+	var st models.Store
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, user_id, name, subdomain, description, status, created_at
+		 FROM stores WHERE id = $1 AND user_id = $2`,
+		storeID, userID,
+	).Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt)
+	return st, err
 }
 
 func (s *Server) hubProductsHTML(c *gin.Context) {
@@ -56,7 +68,10 @@ func (s *Server) hubProductsHTML(c *gin.Context) {
 		list = append(list, r)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "hub_products", gin.H{"Products": list})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "hub_products", gin.H{"Products": list})
+	if err != nil {
+		log.Printf("hub_products render error: %v", err)
+	}
 }
 
 func (s *Server) hubStoresHTML(c *gin.Context) {
@@ -78,7 +93,10 @@ func (s *Server) hubStoresHTML(c *gin.Context) {
 		list = append(list, st)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "hub_stores", gin.H{"Stores": list})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "hub_stores", gin.H{"Stores": list})
+	if err != nil {
+		log.Printf("hub_stores render error: %v", err)
+	}
 }
 
 func (s *Server) hubSearchHTML(c *gin.Context) {
@@ -86,7 +104,10 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 	data := gin.H{"Query": q, "Products": []hubProductRow{}, "Stores": []models.Store{}}
 	if q == "" {
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		_ = s.tmpl.ExecuteTemplate(c.Writer, "hub_search", data)
+		err := s.tmpl.ExecuteTemplate(c.Writer, "hub_search", data)
+		if err != nil {
+			log.Printf("hub_search render error: %v", err)
+		}
 		return
 	}
 	pat := "%" + q + "%"
@@ -131,7 +152,10 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 	data["Products"] = plist
 	data["Stores"] = slist
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "hub_search", data)
+	err = s.tmpl.ExecuteTemplate(c.Writer, "hub_search", data)
+	if err != nil {
+		log.Printf("hub_search render error: %v", err)
+	}
 }
 
 func (s *Server) loadStoreBySubdomain(ctx context.Context, sub string) (models.Store, error) {
@@ -140,13 +164,8 @@ func (s *Server) loadStoreBySubdomain(ctx context.Context, sub string) (models.S
 		`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE subdomain = $1 AND status = 'active'`,
 		sub,
 	).Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return st, err
-	}
 	return st, err
 }
-
-// use gin context for context - need to add import - use c.Request.Context()
 
 func (s *Server) storeHomeHTML(c *gin.Context) {
 	sub := normalizeSubdomain(c.Param("subdomain"))
@@ -155,6 +174,11 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	theme, err := s.loadStoreThemeByID(c.Request.Context(), st.ID)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -178,7 +202,10 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 		products = append(products, p)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "store_home", gin.H{"Store": st, "Products": products})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_home", gin.H{"Store": st, "Products": products, "Theme": theme})
+	if err != nil {
+		log.Printf("store_home render error: %v", err)
+	}
 }
 
 func (s *Server) storeProductHTML(c *gin.Context) {
@@ -188,6 +215,11 @@ func (s *Server) storeProductHTML(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	theme, err := s.loadStoreThemeByID(c.Request.Context(), st.ID)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -211,7 +243,10 @@ func (s *Server) storeProductHTML(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "store_product", gin.H{"Store": st, "Product": p, "Error": c.Query("err")})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_product", gin.H{"Store": st, "Product": p, "Theme": theme, "Error": c.Query("err")})
+	if err != nil {
+		log.Printf("store_product render error: %v", err)
+	}
 }
 
 func (s *Server) storeCartAdd(c *gin.Context) {
@@ -282,6 +317,11 @@ func (s *Server) storeCartHTML(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+	theme, err := s.loadStoreThemeByID(c.Request.Context(), st.ID)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 	cart, err := readCart(c)
 	if err != nil {
 		clearCartCookie(c)
@@ -314,10 +354,13 @@ func (s *Server) storeCartHTML(c *gin.Context) {
 		}
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "store_cart", gin.H{
-		"Store": st, "Lines": lines, "Total": total, "Error": errMsg,
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_cart", gin.H{
+		"Store": st, "Theme": theme, "Lines": lines, "Total": total, "Error": errMsg,
 		"Err": c.Query("err"), "Thanks": c.Query("thanks") != "",
 	})
+	if err != nil {
+		log.Printf("store_cart render error: %v", err)
+	}
 }
 
 func (s *Server) storeCheckout(c *gin.Context) {
@@ -377,6 +420,8 @@ type dashboardData struct {
 	Stores             []models.Store
 	Error              string
 	ClerkBootstrapJSON template.JS // raw JSON for <script type="application/json"> (avoids broken JS parse in IDEs)
+	Theme              models.StoreTheme
+	Store              models.Store
 }
 
 func clerkBootstrapJSON(cfg config.Config) template.JS {
@@ -461,7 +506,10 @@ func (s *Server) dashboardGet(c *gin.Context) {
 		}
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", data)
+	err := s.tmpl.ExecuteTemplate(c.Writer, "dashboard", data)
+	if err != nil {
+		log.Printf("dashboard render error: %v", err)
+	}
 }
 
 func (s *Server) dashboardLogout(c *gin.Context) {
@@ -471,10 +519,13 @@ func (s *Server) dashboardLogout(c *gin.Context) {
 
 func (s *Server) dashboardErr(c *gin.Context, msg string) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	_ = s.tmpl.ExecuteTemplate(c.Writer, "dashboard", dashboardData{
+	err := s.tmpl.ExecuteTemplate(c.Writer, "dashboard", dashboardData{
 		Error:              msg,
 		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
 	})
+	if err != nil {
+		log.Printf("dashboardErr render error: %v", err)
+	}
 }
 
 func (s *Server) dashboardCreateStore(c *gin.Context) {
@@ -497,3 +548,44 @@ func (s *Server) dashboardCreateStore(c *gin.Context) {
 	}
 	c.Redirect(http.StatusSeeOther, "/dashboard")
 }
+
+func (s *Server) dashboardStoreThemeGet(c *gin.Context) {
+	storeID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || storeID < 1 {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	st, err := s.loadOwnedStore(c.Request.Context(), uid, storeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	theme, err := s.loadStoreThemeByID(c.Request.Context(), storeID)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	err = s.tmpl.ExecuteTemplate(c.Writer, "theme_editor", gin.H{
+		"Store":              st,
+		"Theme":              theme,
+		"ClerkBootstrapJSON": clerkBootstrapJSON(s.cfg),
+	})
+	if err != nil {
+		log.Printf("theme_editor render error: %v", err)
+	}
+}
+

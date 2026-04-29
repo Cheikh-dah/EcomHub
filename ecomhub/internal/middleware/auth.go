@@ -14,7 +14,7 @@ import (
 
 const ctxUserID = "userID"
 
-// RequireAuth verifies a Clerk session JWT and maps sub → user_identities → internal user id.
+// RequireAuth verifies a Clerk session JWT and returns JSON 401 if missing/invalid.
 func RequireAuth(pool *pgxpool.Pool, authorizedParties []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearer(c)
@@ -28,6 +28,25 @@ func RequireAuth(pool *pgxpool.Pool, authorizedParties []string) gin.HandlerFunc
 			return
 		}
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+	}
+}
+
+// RequireAuthRedirect verifies a Clerk session JWT and redirects to /dashboard if missing/invalid.
+func RequireAuthRedirect(pool *pgxpool.Pool, authorizedParties []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := extractBearer(c)
+		if token == "" {
+			c.Redirect(http.StatusSeeOther, "/dashboard")
+			c.Abort()
+			return
+		}
+		if uid, ok := authenticate(c.Request.Context(), pool, token, authorizedParties); ok {
+			c.Set(ctxUserID, uid)
+			c.Next()
+			return
+		}
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		c.Abort()
 	}
 }
 
