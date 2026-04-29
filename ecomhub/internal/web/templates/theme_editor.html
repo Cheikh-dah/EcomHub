@@ -2,10 +2,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{template "head_meta" .}}
   <title>Theme Editor · {{.Store.Name}} · EcomHub</title>
-  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 {{template "header" .}}
@@ -58,9 +56,9 @@
     <section class="theme-preview" id="te-preview">
       <p class="theme-preview-label">Preview</p>
 
-      <div class="theme-preview-header">
+      <div class="theme-preview-header" id="te-preview-header">
         <img id="te-preview-logo" src="" alt="" class="theme-preview-logo">
-        <span>{{.Store.Name}}</span>
+        <span id="te-preview-name">{{.Store.Name}}</span>
       </div>
 
       <div class="theme-preview-card {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}" id="te-preview-card">
@@ -78,7 +76,7 @@
 
 <script>
 (function () {
-  var storeID = {{.Store.ID}};
+  var storeID = parseInt("{{.Store.ID}}", 10);
   var elPrimary = document.getElementById('te-primary');
   var elPrimaryHex = document.getElementById('te-primary-hex');
   var elAccent = document.getElementById('te-accent');
@@ -88,6 +86,7 @@
   var elStatus = document.getElementById('te-status');
   var elPreview = document.getElementById('te-preview');
   var elPreviewLogo = document.getElementById('te-preview-logo');
+  var elPreviewName = document.getElementById('te-preview-name');
   var elPreviewCard = document.getElementById('te-preview-card');
   var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
 
@@ -113,9 +112,11 @@
     if (logo) {
       elPreviewLogo.src = logo;
       elPreviewLogo.style.display = 'block';
+      elPreviewName.style.display = 'none';
     } else {
       elPreviewLogo.removeAttribute('src');
       elPreviewLogo.style.display = 'none';
+      elPreviewName.style.display = 'inline';
     }
 
     if (selectedLayout() === 'compact') {

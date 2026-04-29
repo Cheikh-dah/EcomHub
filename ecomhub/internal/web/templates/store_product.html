@@ -2,15 +2,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{template "head_meta" .}}
   <title>{{.Product.Name}} · {{.Store.Name}}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  {{with .Theme}}
   <style>
     :root {
-      --accent: {{.Theme.AccentColor}};
+      --primary-color: {{.PrimaryColor}};
+      --accent-color: {{.AccentColor}};
     }
   </style>
+  {{end}}
 </head>
 <body>
 {{template "header" .}}
