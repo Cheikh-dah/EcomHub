@@ -185,7 +185,7 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 	}
 	q := strings.TrimSpace(c.Query("q"))
 	var rows pgx.Rows
-	
+
 	if q != "" {
 		pat := "%" + q + "%"
 		rows, err = s.pool.Query(c.Request.Context(),
@@ -599,4 +599,3 @@ func (s *Server) dashboardStoreThemeGet(c *gin.Context) {
 		log.Printf("theme_editor render error: %v", err)
 	}
 }
-
