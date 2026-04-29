@@ -46,17 +46,23 @@ type productUpdateBody struct {
 }
 
 type storeThemeBody struct {
-	PrimaryColor string `json:"primary_color"`
-	AccentColor  string `json:"accent_color"`
-	LogoURL      string `json:"logo_url"`
-	LayoutPreset string `json:"layout_preset"`
+	PrimaryColor string  `json:"primary_color"`
+	AccentColor  string  `json:"accent_color"`
+	LogoURL      string  `json:"logo_url"`
+	LayoutPreset string  `json:"layout_preset"`
+	Preset       string  `json:"preset"`
+	Rounding     float64 `json:"rounding"`
+	Version      int     `json:"version"`
 }
 
 type storeThemeUpdateBody struct {
-	PrimaryColor *string `json:"primary_color"`
-	AccentColor  *string `json:"accent_color"`
-	LogoURL      *string `json:"logo_url"`
-	LayoutPreset *string `json:"layout_preset"`
+	PrimaryColor *string  `json:"primary_color"`
+	AccentColor  *string  `json:"accent_color"`
+	LogoURL      *string  `json:"logo_url"`
+	LayoutPreset *string  `json:"layout_preset"`
+	Preset       *string  `json:"preset"`
+	Rounding     *float64 `json:"rounding"`
+	Version      *int     `json:"version"`
 }
 
 type cartAddBody struct {
@@ -181,12 +187,17 @@ func (s *Server) assertStoreOwner(ctx context.Context, userID uuid.UUID, storeID
 }
 
 func defaultStoreTheme() models.StoreTheme {
-	return models.StoreTheme{
+	t := models.StoreTheme{
 		PrimaryColor: "#1d9bf0",
 		AccentColor:  "#00ba7c",
 		LogoURL:      "",
 		LayoutPreset: "default",
+		Preset:       "minimal",
+		Rounding:     0.5,
+		Version:      1,
 	}
+	t.Normalize()
+	return t
 }
 
 func normalizeColor(v string, fallback string) (string, error) {
@@ -249,6 +260,13 @@ func normalizeStoreTheme(in storeThemeBody) (models.StoreTheme, error) {
 	if err != nil {
 		return out, err
 	}
+
+	// DNA v2
+	out.Preset = in.Preset
+	out.Rounding = in.Rounding
+	out.Version = in.Version
+	out.Normalize()
+
 	return out, nil
 }
 
@@ -279,6 +297,19 @@ func normalizeStoreThemePatch(curr models.StoreTheme, patch storeThemeUpdateBody
 			return out, err
 		}
 	}
+
+	// DNA v2
+	if patch.Preset != nil {
+		out.Preset = *patch.Preset
+	}
+	if patch.Rounding != nil {
+		out.Rounding = *patch.Rounding
+	}
+	if patch.Version != nil {
+		out.Version = *patch.Version
+	}
+	out.Normalize()
+
 	return out, nil
 }
 

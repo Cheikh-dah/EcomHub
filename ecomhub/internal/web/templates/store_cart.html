@@ -13,7 +13,7 @@
   </style>
   {{end}}
 </head>
-<body>
+<body class="storefront preset-{{.Theme.Preset}}" style="--rounding: {{.Theme.Rounding}}">
 {{template "header" .}}
 <main class="container">
   <h1>Cart — {{.Store.Name}}</h1>

@@ -35,6 +35,25 @@
         <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
       </label>
 
+      <hr style="width: 100%; border: 0; border-top: 1px solid var(--border); margin: 0.5rem 0;">
+
+      <label>
+        Brand Preset
+        <select id="te-preset" class="logo-input">
+          <option value="minimal" {{if eq .Theme.Preset "minimal"}}selected{{end}}>Minimal (Clean & Modern)</option>
+          <option value="luxury" {{if eq .Theme.Preset "luxury"}}selected{{end}}>Luxury (Elegant & High-end)</option>
+          <option value="playful" {{if eq .Theme.Preset "playful"}}selected{{end}}>Playful (Bold & Vibrant)</option>
+        </select>
+      </label>
+
+      <label>
+        Corner Rounding
+        <div style="display: flex; align-items: center; gap: 1rem; width: 100%; max-width: 420px;">
+          <input type="range" id="te-rounding" min="0" max="1" step="0.1" value="{{.Theme.Rounding}}" style="flex: 1; margin: 0;">
+          <span id="te-rounding-val" style="font-family: monospace; width: 2.5rem; text-align: right;">{{.Theme.Rounding}}</span>
+        </div>
+      </label>
+
       <label>Layout preset</label>
       <div class="layout-toggle">
         <label class="toggle-opt">
@@ -88,6 +107,9 @@
   var elPreviewLogo = document.getElementById('te-preview-logo');
   var elPreviewName = document.getElementById('te-preview-name');
   var elPreviewCard = document.getElementById('te-preview-card');
+  var elPreset = document.getElementById('te-preset');
+  var elRounding = document.getElementById('te-rounding');
+  var elRoundingVal = document.getElementById('te-rounding-val');
   var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
 
   function isHex(v) {
@@ -101,13 +123,29 @@
     return 'default';
   }
 
+  function getPresetColors(preset) {
+    switch(preset) {
+      case 'luxury': return { primary: '#1a1a1a', accent: '#c9a96e' };
+      case 'playful': return { primary: '#7c3aed', accent: '#f97316' };
+      default: return { primary: '#111111', accent: '#2563eb' };
+    }
+  }
+
   function applyPreview() {
     var primary = elPrimaryHex.value.trim();
     var accent = elAccentHex.value.trim();
     var logo = elLogo.value.trim();
+    var preset = elPreset.value;
+    var rounding = elRounding.value;
 
-    elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : '#1d9bf0');
-    elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : '#00ba7c');
+    // Apply DNA colors if not overridden by hex (for preview simplicity we show preset impact)
+    var pColors = getPresetColors(preset);
+    elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : pColors.primary);
+    elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : pColors.accent);
+    
+    // Apply rounding
+    elPreview.style.setProperty('--rounding', rounding);
+    elRoundingVal.textContent = parseFloat(rounding).toFixed(1);
 
     if (logo) {
       elPreviewLogo.src = logo;
@@ -150,6 +188,8 @@
   });
 
   elLogo.addEventListener('input', applyPreview);
+  elPreset.addEventListener('change', applyPreview);
+  elRounding.addEventListener('input', applyPreview);
   Array.prototype.forEach.call(layoutRadios, function (radio) {
     radio.addEventListener('change', applyPreview);
   });
@@ -183,7 +223,9 @@
         primary_color: primary,
         accent_color: accent,
         logo_url: logo,
-        layout_preset: selectedLayout()
+        layout_preset: selectedLayout(),
+        preset: elPreset.value,
+        rounding: parseFloat(elRounding.value)
       })
     })
     .then(function (res) {

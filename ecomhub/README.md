@@ -5,8 +5,10 @@ Multi-tenant e-commerce platform built with Go, Gin, and Clerk.
 ## Features
 
 - **Merchant Dashboard**: Create and manage multiple stores.
-- **Storefront Theme Customization**: Dynamic accent colors, logos, and layout presets (Default/Compact).
+- **DNA Theme Engine**: Designer-level storefronts with zero effort using Brand Presets (Minimal, Luxury, Playful) and Corner Rounding DNA.
+- **Storefront Customization**: Dynamic colors, logos, and layout presets (Default/Compact).
 - **Lightweight Marketplace**: Search products across all active stores.
+- **Storefront Search**: Built-in search functionality for individual stores.
 - **Secure Authentication**: Integrated with Clerk for user identity and session management.
 - **Hot Reloading**: Developer-friendly setup with Air.
 
@@ -43,7 +45,9 @@ Multi-tenant e-commerce platform built with Go, Gin, and Clerk.
 
 ## Documentation
 
-- [Theme Customization](docs/THEME-CUSTOMIZATION.md)
+- [Theme Engine Strategy (v2)](docs/STORE-DESIGN-STRATEGY.md)
+- [Shippable Theme Plan](docs/SHIPPABLE-THEME-PLAN.md)
+- [Theme Customization (Legacy)](docs/THEME-CUSTOMIZATION.md)
 - [Auth Bridge Implementation](docs/AUTH-BRIDGE.md)
 - [REST API Reference](docs/REST-API-REFERENCE.md)
 - [Cheatsheets](docs/ECOMHUB-CHEATSHEETS.md)

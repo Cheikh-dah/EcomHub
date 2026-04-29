@@ -24,10 +24,45 @@ type Store struct {
 }
 
 type StoreTheme struct {
+	// Legacy fields (Maintained for backward compatibility)
 	PrimaryColor string `json:"primary_color"`
 	AccentColor  string `json:"accent_color"`
 	LogoURL      string `json:"logo_url,omitempty"`
-	LayoutPreset string `json:"layout_preset"`
+	LayoutPreset string `json:"layout_preset"` // legacy: default | compact
+
+	// DNA v2 (Phase 1)
+	Preset   string  `json:"preset"`   // minimal | luxury | playful
+	Rounding float64 `json:"rounding"` // 0.0 -> 1.0
+	Version  int     `json:"version"`
+
+	// Phase 2+ placeholders (commented out or empty for now to avoid confusion)
+	// SpacingScale string `json:"spacing_scale,omitempty"`
+}
+
+func (t *StoreTheme) Normalize() {
+	// 1. Enforce allowed Presets
+	if t.Preset != "minimal" && t.Preset != "luxury" && t.Preset != "playful" {
+		t.Preset = "minimal"
+	}
+
+	// 2. Clamp Rounding [0, 1]
+	if t.Rounding < 0 {
+		t.Rounding = 0
+	} else if t.Rounding > 1 {
+		t.Rounding = 1
+	}
+
+	// 3. Migration & Versioning
+	if t.Version == 0 {
+		t.ApplyLegacy()
+		t.Version = 1
+	}
+}
+
+// ApplyLegacy maps old fields to the new DNA system where applicable.
+func (t *StoreTheme) ApplyLegacy() {
+	// Example: If a legacy store has a specific color, we might want to preserve it
+	// or map layout_preset to a future spacing_scale.
 }
 
 // UserIdentity maps an external auth provider subject to an internal user.
