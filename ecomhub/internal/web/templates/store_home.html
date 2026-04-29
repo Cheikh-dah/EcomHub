@@ -26,10 +26,12 @@
   </form>
 
   {{if .Query}}
-  <p class="muted">
-    Showing {{len .Products}} result{{if ne (len .Products) 1}}s{{end}} for <strong>"{{.Query}}"</strong>. 
-    <a href="/s/{{.Store.Subdomain}}">Clear</a>
-  </p>
+    {{if gt (len .Products) 0}}
+    <p class="muted">
+      Showing {{len .Products}} result{{if ne (len .Products) 1}}s{{end}} for <strong>"{{.Query}}"</strong>. 
+      <a href="/s/{{.Store.Subdomain}}">Clear</a>
+    </p>
+    {{end}}
   {{end}}
   <ul class="grid {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}">
     {{range .Products}}
@@ -39,9 +41,9 @@
     </li>
     {{else}}
       {{if $.Query}}
-      <p>No products found matching your search.</p>
+      <p class="empty-state">No products found matching your search. <a href="/s/{{$.Store.Subdomain}}">Clear search</a></p>
       {{else}}
-      <p>No products in this store yet.</p>
+      <p class="empty-state">No products in this store yet.</p>
       {{end}}
     {{end}}
   </ul>

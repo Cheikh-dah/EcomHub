@@ -356,3 +356,11 @@ code {
   max-height: 32px;
   vertical-align: middle;
 }
+
+.empty-state {
+  opacity: 0.7;
+  text-align: center;
+  margin-top: 3rem;
+  padding: 2rem;
+  grid-column: 1 / -1;
+}
