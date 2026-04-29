@@ -183,10 +183,21 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	rows, err := s.pool.Query(c.Request.Context(),
-		`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at FROM products WHERE store_id = $1 ORDER BY id`,
-		st.ID,
-	)
+	q := strings.TrimSpace(c.Query("q"))
+	var rows pgx.Rows
+	
+	if q != "" {
+		pat := "%" + q + "%"
+		rows, err = s.pool.Query(c.Request.Context(),
+			`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at FROM products WHERE store_id = $1 AND (name ILIKE $2 OR description ILIKE $2) ORDER BY id`,
+			st.ID, pat,
+		)
+	} else {
+		rows, err = s.pool.Query(c.Request.Context(),
+			`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at FROM products WHERE store_id = $1 ORDER BY id`,
+			st.ID,
+		)
+	}
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -202,7 +213,7 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 		products = append(products, p)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	err = s.tmpl.ExecuteTemplate(c.Writer, "store_home", gin.H{"Store": st, "Products": products, "Theme": theme})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_home", gin.H{"Store": st, "Products": products, "Theme": theme, "Query": q})
 	if err != nil {
 		log.Printf("store_home render error: %v", err)
 	}

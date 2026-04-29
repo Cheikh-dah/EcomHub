@@ -19,6 +19,15 @@
 <main class="container">
   <h1>{{.Store.Name}}</h1>
   <p class="lead">{{.Store.Description}}</p>
+
+  <form class="search-form" action="/s/{{.Store.Subdomain}}" method="GET">
+    <input type="search" name="q" placeholder="Search {{.Store.Name}}..." value="{{.Query}}">
+    <button type="submit">Search</button>
+  </form>
+
+  {{if .Query}}
+  <p class="muted">Showing results for <strong>"{{.Query}}"</strong>. <a href="/s/{{.Store.Subdomain}}">Clear</a></p>
+  {{end}}
   <ul class="grid {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}">
     {{range .Products}}
     <li class="card">
