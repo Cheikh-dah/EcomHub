@@ -31,6 +31,38 @@
       </label>
 
       <label>
+        Page background
+        <div class="color-row">
+          <input type="color" id="te-page-bg" value="{{.Theme.PageBg}}">
+          <input type="text" id="te-page-bg-hex" class="hex-input" value="{{.Theme.PageBg}}" maxlength="7" placeholder="#ffffff">
+        </div>
+      </label>
+
+      <label>
+        Text color
+        <div class="color-row">
+          <input type="color" id="te-text-color" value="{{.Theme.TextColor}}">
+          <input type="text" id="te-text-color-hex" class="hex-input" value="{{.Theme.TextColor}}" maxlength="7" placeholder="#111111">
+        </div>
+      </label>
+
+      <label>
+        Card background
+        <div class="color-row">
+          <input type="color" id="te-card-bg" value="{{.Theme.CardBg}}">
+          <input type="text" id="te-card-bg-hex" class="hex-input" value="{{.Theme.CardBg}}" maxlength="7" placeholder="#f9fafb">
+        </div>
+      </label>
+
+      <label>
+        Footer background
+        <div class="color-row">
+          <input type="color" id="te-footer-bg" value="{{.Theme.FooterBg}}">
+          <input type="text" id="te-footer-bg-hex" class="hex-input" value="{{.Theme.FooterBg}}" maxlength="7" placeholder="#ffffff">
+        </div>
+      </label>
+
+      <label>
         Logo URL
         <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
       </label>
@@ -88,6 +120,9 @@
           <button class="theme-preview-button" type="button">Add to cart</button>
         </div>
       </div>
+      <div class="theme-preview-footer" id="te-preview-footer">
+        Footer preview
+      </div>
     </section>
   </div>
 </main>
@@ -100,6 +135,14 @@
   var elPrimaryHex = document.getElementById('te-primary-hex');
   var elAccent = document.getElementById('te-accent');
   var elAccentHex = document.getElementById('te-accent-hex');
+  var elPageBg = document.getElementById('te-page-bg');
+  var elPageBgHex = document.getElementById('te-page-bg-hex');
+  var elTextColor = document.getElementById('te-text-color');
+  var elTextColorHex = document.getElementById('te-text-color-hex');
+  var elCardBg = document.getElementById('te-card-bg');
+  var elCardBgHex = document.getElementById('te-card-bg-hex');
+  var elFooterBg = document.getElementById('te-footer-bg');
+  var elFooterBgHex = document.getElementById('te-footer-bg-hex');
   var elLogo = document.getElementById('te-logo');
   var elSave = document.getElementById('te-save');
   var elStatus = document.getElementById('te-status');
@@ -134,6 +177,10 @@
   function applyPreview() {
     var primary = elPrimaryHex.value.trim();
     var accent = elAccentHex.value.trim();
+    var pageBg = elPageBgHex.value.trim();
+    var textColor = elTextColorHex.value.trim();
+    var cardBg = elCardBgHex.value.trim();
+    var footerBg = elFooterBgHex.value.trim();
     var logo = elLogo.value.trim();
     var preset = elPreset.value;
     var rounding = elRounding.value;
@@ -142,6 +189,10 @@
     var pColors = getPresetColors(preset);
     elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : pColors.primary);
     elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : pColors.accent);
+    elPreview.style.setProperty('--theme-page-bg', isHex(pageBg) ? pageBg : '#ffffff');
+    elPreview.style.setProperty('--theme-text-color', isHex(textColor) ? textColor : '#111111');
+    elPreview.style.setProperty('--theme-card-bg', isHex(cardBg) ? cardBg : '#f9fafb');
+    elPreview.style.setProperty('--theme-footer-bg', isHex(footerBg) ? footerBg : 'transparent');
     
     // Apply rounding
     elPreview.style.setProperty('--rounding', rounding);
@@ -187,6 +238,42 @@
     applyPreview();
   });
 
+  elPageBg.addEventListener('input', function () {
+    elPageBgHex.value = elPageBg.value;
+    applyPreview();
+  });
+  elPageBgHex.addEventListener('input', function () {
+    if (isHex(elPageBgHex.value)) elPageBg.value = elPageBgHex.value;
+    applyPreview();
+  });
+
+  elTextColor.addEventListener('input', function () {
+    elTextColorHex.value = elTextColor.value;
+    applyPreview();
+  });
+  elTextColorHex.addEventListener('input', function () {
+    if (isHex(elTextColorHex.value)) elTextColor.value = elTextColorHex.value;
+    applyPreview();
+  });
+
+  elCardBg.addEventListener('input', function () {
+    elCardBgHex.value = elCardBg.value;
+    applyPreview();
+  });
+  elCardBgHex.addEventListener('input', function () {
+    if (isHex(elCardBgHex.value)) elCardBg.value = elCardBgHex.value;
+    applyPreview();
+  });
+
+  elFooterBg.addEventListener('input', function () {
+    elFooterBgHex.value = elFooterBg.value;
+    applyPreview();
+  });
+  elFooterBgHex.addEventListener('input', function () {
+    if (isHex(elFooterBgHex.value)) elFooterBg.value = elFooterBgHex.value;
+    applyPreview();
+  });
+
   elLogo.addEventListener('input', applyPreview);
   elPreset.addEventListener('change', applyPreview);
   elRounding.addEventListener('input', applyPreview);
@@ -197,6 +284,10 @@
   elSave.addEventListener('click', function () {
     var primary = elPrimaryHex.value.trim();
     var accent = elAccentHex.value.trim();
+    var pageBg = elPageBgHex.value.trim();
+    var textColor = elTextColorHex.value.trim();
+    var cardBg = elCardBgHex.value.trim();
+    var footerBg = elFooterBgHex.value.trim();
     var logo = elLogo.value.trim();
 
     if (!isHex(primary)) {
@@ -205,6 +296,22 @@
     }
     if (!isHex(accent)) {
       setStatus('Accent color must be a valid hex value.', true);
+      return;
+    }
+    if (pageBg && !isHex(pageBg)) {
+      setStatus('Page background must be a valid hex value.', true);
+      return;
+    }
+    if (textColor && !isHex(textColor)) {
+      setStatus('Text color must be a valid hex value.', true);
+      return;
+    }
+    if (cardBg && !isHex(cardBg)) {
+      setStatus('Card background must be a valid hex value.', true);
+      return;
+    }
+    if (footerBg && !isHex(footerBg)) {
+      setStatus('Footer background must be a valid hex value.', true);
       return;
     }
     if (logo && !/^https?:\/\/.+/.test(logo)) {
@@ -222,6 +329,10 @@
       body: JSON.stringify({
         primary_color: primary,
         accent_color: accent,
+        page_bg: pageBg,
+        text_color: textColor,
+        card_bg: cardBg,
+        footer_bg: footerBg,
         logo_url: logo,
         layout_preset: selectedLayout(),
         preset: elPreset.value,

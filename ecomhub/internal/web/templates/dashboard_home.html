@@ -1,0 +1,47 @@
+{{define "dashboard_home"}}
+{{template "dashboard_header" .}}
+    {{if .Error}}
+        <div class="error-msg" style="color: red; margin-bottom: 1rem;">{{.Error}}</div>
+    {{end}}
+
+    {{if not .Stores}}
+        <div class="onboarding-card card" style="text-align: center; padding: 3rem;">
+            <h2>Welcome to EcomHub!</h2>
+            <p style="margin-bottom: 2rem;">It looks like you don't have a store yet. Let's change that.</p>
+            <form action="/dashboard/stores" method="POST" class="store-form" style="max-width: 400px; margin: 0 auto; text-align: left;">
+                <div class="form-group">
+                    <label>Store Name</label>
+                    <input type="text" name="name" required placeholder="e.g. My Awesome Store">
+                </div>
+                <div class="form-group">
+                    <label>Subdomain</label>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="text" name="subdomain" required pattern="^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$" title="Letters, numbers, and hyphens only. No leading/trailing hyphens. Max 63 chars." placeholder="my-store">
+                        <span style="color: var(--text-muted); font-size: 0.9rem;">.ecomhub.com</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" rows="3" placeholder="What are you selling?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Create Store</button>
+            </form>
+        </div>
+    {{else}}
+        <h2>Your Stores</h2>
+        <div class="stores-grid" style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+            {{range .Stores}}
+                <div class="card store-card">
+                    <h3>{{.Name}}</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">{{.Subdomain}}.ecomhub.com</p>
+                    <p>{{.Description}}</p>
+                    <div class="store-actions" style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                        <a href="/s/{{.Subdomain}}" target="_blank" class="btn btn-secondary">View Store</a>
+                        <a href="/dashboard/stores/{{.ID}}/theme" class="btn btn-primary">Edit Theme</a>
+                    </div>
+                </div>
+            {{end}}
+        </div>
+    {{end}}
+{{template "dashboard_footer" .}}
+{{end}}

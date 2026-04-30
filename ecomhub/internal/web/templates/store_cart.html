@@ -1,21 +1,4 @@
-{{define "store_cart"}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  {{template "head_meta" .}}
-  <title>Cart · {{.Store.Name}}</title>
-  {{with .Theme}}
-  <style>
-    :root {
-      --primary-color: {{.PrimaryColor}};
-      --accent-color: {{.AccentColor}};
-    }
-  </style>
-  {{end}}
-</head>
-<body class="storefront preset-{{.Theme.Preset}}" style="--rounding: {{.Theme.Rounding}}">
-{{template "header" .}}
-<main class="container">
+{{define "store_cart_content"}}
   <h1>Cart — {{.Store.Name}}</h1>
   {{if .Err}}<p class="error">{{.Err}}</p>{{end}}
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
@@ -48,8 +31,4 @@
   <p>Your cart is empty.</p>
   {{end}}
   <p><a href="/s/{{.Store.Subdomain}}">Continue shopping</a></p>
-</main>
-{{template "footer" .}}
-</body>
-</html>
 {{end}}

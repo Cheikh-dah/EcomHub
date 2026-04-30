@@ -35,6 +35,12 @@ type StoreTheme struct {
 	Rounding float64 `json:"rounding"` // 0.0 -> 1.0
 	Version  int     `json:"version"`
 
+	// Phase 2: Design Tokens
+	PageBg    string `json:"page_bg"`
+	TextColor string `json:"text_color"`
+	CardBg    string `json:"card_bg"`
+	FooterBg  string `json:"footer_bg"`
+
 	// Phase 2+ placeholders (commented out or empty for now to avoid confusion)
 	// SpacingScale string `json:"spacing_scale,omitempty"`
 }
@@ -52,7 +58,21 @@ func (t *StoreTheme) Normalize() {
 		t.Rounding = 1
 	}
 
-	// 3. Migration & Versioning
+	// 3. Set defaults for design tokens
+	if t.PageBg == "" {
+		t.PageBg = "#ffffff"
+	}
+	if t.TextColor == "" {
+		t.TextColor = "#111111"
+	}
+	if t.CardBg == "" {
+		t.CardBg = "#ffffff"
+	}
+	if t.FooterBg == "" {
+		t.FooterBg = "transparent"
+	}
+
+	// 4. Migration & Versioning
 	if t.Version == 0 {
 		t.ApplyLegacy()
 		t.Version = 1

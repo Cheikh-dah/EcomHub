@@ -1,68 +1,65 @@
-{{define "store_home"}}
-<!-- Theme test -->
-<!DOCTYPE html>
-<html lang="en">
+{{define "store_home_content"}}
+  <section class="store-hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Welcome to</span>
+      <h1>{{.Store.Name}}</h1>
+      {{if .Store.Description}}<p class="hero-copy-text">{{.Store.Description}}</p>{{end}}
+    </div>
 
-<head>
-  {{template "head_meta" .}}
-  <title>{{.Store.Name}} · Store</title>
-  {{with .Theme}}
-  <style>
-    :root {
-      --primary-color: {
-          {
-          .PrimaryColor
-        }
-      }
-
-      ;
-
-      --accent-color: {
-          {
-          .AccentColor
-        }
-      }
-
-      ;
-    }
-  </style>
-  {{end}}
-</head>
-
-<body class="storefront preset-{{.Theme.Preset}}" style="--rounding: {{.Theme.Rounding}}">
-  {{template "header" .}}
-  <main class="container">
-    <h1>{{.Store.Name}}</h1>
-    <p class="lead">{{.Store.Description}}</p>
-
-    <form class="search-form" action="/s/{{.Store.Subdomain}}" method="GET">
-      <input type="search" name="q" placeholder="Search {{.Store.Name}}..." value="{{.Query}}">
+    <form action="/s/{{.Store.Subdomain}}" method="GET" class="search-form hero-search">
+      <input type="search" name="q" placeholder="Search products..." value="{{.Query}}">
       <button type="submit">Search</button>
+      {{if .Query}}<a href="/s/{{.Store.Subdomain}}" class="clear-search">Clear</a>{{end}}
     </form>
+  </section>
 
+  <section class="products-section" id="products">
     {{if .Query}}
-    <p class="muted">
-      Showing {{len .Products}} result{{if ne (len .Products) 1}}s{{end}} for <strong>"{{.Query}}"</strong>.
-      <a href="/s/{{.Store.Subdomain}}">Clear</a>
-    </p>
+      <p class="muted search-result">
+        Showing {{len .Products}} result{{if ne (len .Products) 1}}s{{end}} for <strong>"{{.Query}}"</strong>.
+        <a href="/s/{{.Store.Subdomain}}">Clear</a>
+      </p>
     {{end}}
-    <ul class="grid {{if eq .Theme.LayoutPreset " compact"}}compact{{end}}">
-      {{range .Products}}
-      <li class="card">
-        <a href="/s/{{$.Store.Subdomain}}/products/{{.ID}}">{{.Name}}</a>
-        <p class="muted">${{printf "%.2f" .Price}} · {{.Stock}} in stock</p>
-      </li>
-      {{else}}
-      {{if $.Query}}
-      <p>No products found matching your search.</p>
-      {{else}}
-      <p>No products in this store yet.</p>
-      {{end}}
-      {{end}}
-    </ul>
-  </main>
-  {{template "footer" .}}
-</body>
 
-</html>
+    {{if .Products}}
+      {{if not .Query}}<p class="muted">Found {{len .Products}} products.</p>{{end}}
+      <ul class="grid {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}">
+        {{range .Products}}
+        <li class="card product-card">
+          <div class="product-image-wrapper">
+            {{if .ImageURL}}
+              <img src="{{.ImageURL}}" alt="{{.Name}}" />
+            {{else}}
+              <div class="product-image-placeholder">No image available</div>
+            {{end}}
+          </div>
+
+          <div class="product-info">
+            <a href="/s/{{$.Store.Subdomain}}/products/{{.ID}}" class="product-name">
+              {{.Name}}
+            </a>
+
+            <p class="product-meta">{{.Stock}} in stock</p>
+            <p class="product-price">
+              {{if .Price}}${{printf "%.2f" .Price}}{{else}}$0.00{{end}}
+            </p>
+
+            <form action="/s/{{$.Store.Subdomain}}/cart/add" method="POST">
+              <input type="hidden" name="product_id" value="{{.ID}}" />
+              <button class="btn btn-primary" {{if le .Stock 0}}disabled{{end}}>
+                {{if le .Stock 0}}Out of stock{{else}}Add to cart{{end}}
+              </button>
+            </form>
+          </div>
+        </li>
+        {{end}}
+      </ul>
+    {{else}}
+      {{if .Query}}
+        <p>No products found matching your search.</p>
+      {{else}}
+        <p>No products in this store yet.</p>
+      {{end}}
+    {{end}}
+  </section>
 {{end}}

@@ -1,24 +1,9 @@
-{{define "store_product"}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  {{template "head_meta" .}}
-  <title>{{.Product.Name}} · {{.Store.Name}}</title>
-  {{with .Theme}}
-  <style>
-    :root {
-      --primary-color: {{.PrimaryColor}};
-      --accent-color: {{.AccentColor}};
-    }
-  </style>
-  {{end}}
-</head>
-<body class="storefront preset-{{.Theme.Preset}}" style="--rounding: {{.Theme.Rounding}}">
-{{template "header" .}}
-<main class="container product-detail">
+{{define "store_product_content"}}
   <p class="crumb"><a href="/s/{{.Store.Subdomain}}">← {{.Store.Name}}</a></p>
   <h1>{{.Product.Name}}</h1>
-  <p class="price">${{printf "%.2f" .Product.Price}}</p>
+  <p class="price">
+    {{if .Product.Price}}${{printf "%.2f" .Product.Price}}{{else}}$0.00{{end}}
+  </p>
   <p>{{.Product.Description}}</p>
   {{if .Product.ImageURL}}
   <p><img class="product-img" src="{{.Product.ImageURL}}" alt=""></p>
@@ -31,8 +16,4 @@
     <button type="submit" {{if le .Product.Stock 0}}disabled{{end}}>Add to cart</button>
   </form>
   <p><a href="/s/{{.Store.Subdomain}}/cart">View cart</a></p>
-</main>
-{{template "footer" .}}
-</body>
-</html>
 {{end}}

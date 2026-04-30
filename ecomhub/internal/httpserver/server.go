@@ -72,8 +72,12 @@ func (s *Server) Mount(r *gin.Engine) {
 
 	dashAuth := r.Group("/dashboard")
 	dashAuth.Use(middleware.RequireAuthRedirect(s.pool, s.cfg.ClerkAuthorizedParties))
+	dashAuth.GET("/stores", s.dashboardStoresGet)
 	dashAuth.POST("/stores", s.dashboardCreateStore)
 	dashAuth.GET("/stores/:id/theme", s.dashboardStoreThemeGet)
+	dashAuth.GET("/products", s.dashboardProductsGet)
+	dashAuth.POST("/products", s.dashboardProductsPost)
+	dashAuth.POST("/products/:id/delete", s.dashboardProductDelete)
 
 	sub := r.Group("/s/:subdomain")
 	{

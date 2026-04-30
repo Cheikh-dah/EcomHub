@@ -213,7 +213,7 @@ func (s *Server) storeHomeHTML(c *gin.Context) {
 		products = append(products, p)
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	err = s.tmpl.ExecuteTemplate(c.Writer, "store_home", gin.H{"Store": st, "Products": products, "Theme": theme, "Query": q})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_layout", gin.H{"Store": st, "Products": products, "Theme": theme, "Query": q})
 	if err != nil {
 		log.Printf("store_home render error: %v", err)
 	}
@@ -254,7 +254,7 @@ func (s *Server) storeProductHTML(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	err = s.tmpl.ExecuteTemplate(c.Writer, "store_product", gin.H{"Store": st, "Product": p, "Theme": theme, "Error": c.Query("err")})
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_layout", gin.H{"Store": st, "Product": p, "Theme": theme, "Error": c.Query("err")})
 	if err != nil {
 		log.Printf("store_product render error: %v", err)
 	}
@@ -365,7 +365,7 @@ func (s *Server) storeCartHTML(c *gin.Context) {
 		}
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	err = s.tmpl.ExecuteTemplate(c.Writer, "store_cart", gin.H{
+	err = s.tmpl.ExecuteTemplate(c.Writer, "store_layout", gin.H{
 		"Store": st, "Theme": theme, "Lines": lines, "Total": total, "Error": errMsg,
 		"Err": c.Query("err"), "Thanks": c.Query("thanks") != "",
 	})
@@ -429,10 +429,13 @@ type dashboardData struct {
 	LoggedIn           bool
 	Token              bool
 	Stores             []models.Store
+	Products           []models.Product
 	Error              string
 	ClerkBootstrapJSON template.JS // raw JSON for <script type="application/json"> (avoids broken JS parse in IDEs)
 	Theme              models.StoreTheme
 	Store              models.Store
+	ActiveNav          string
+	Title              string
 }
 
 func clerkBootstrapJSON(cfg config.Config) template.JS {
@@ -494,6 +497,8 @@ func (s *Server) dashboardGet(c *gin.Context) {
 		LoggedIn:           ok,
 		Token:              ok,
 		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
+		ActiveNav:          "home",
+		Title:              "Home",
 	}
 	switch strings.TrimSpace(c.Query("err")) {
 	case "invalid_store":
@@ -517,7 +522,7 @@ func (s *Server) dashboardGet(c *gin.Context) {
 		}
 	}
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	err := s.tmpl.ExecuteTemplate(c.Writer, "dashboard", data)
+	err := s.tmpl.ExecuteTemplate(c.Writer, "dashboard_home", data)
 	if err != nil {
 		log.Printf("dashboard render error: %v", err)
 	}
@@ -597,5 +602,172 @@ func (s *Server) dashboardStoreThemeGet(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("theme_editor render error: %v", err)
+	}
+}
+
+func (s *Server) dashboardProductsGet(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	data := dashboardData{
+		LoggedIn:           true,
+		Token:              true,
+		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
+		ActiveNav:          "products",
+		Title:              "Products",
+	}
+
+	// Fetch stores for the store selector
+	rows, err := s.pool.Query(c.Request.Context(), `SELECT id, name FROM stores WHERE user_id = $1 ORDER BY id`, uid)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var st models.Store
+			if err := rows.Scan(&st.ID, &st.Name); err == nil {
+				data.Stores = append(data.Stores, st)
+			}
+		}
+	}
+
+	// Fetch products
+	pRows, err := s.pool.Query(c.Request.Context(), `
+		SELECT p.id, p.store_id, p.name, p.description, p.price, p.stock, p.image_url, p.created_at
+		FROM products p
+		JOIN stores s ON p.store_id = s.id
+		WHERE s.user_id = $1
+		ORDER BY p.created_at DESC`, uid)
+	if err == nil {
+		defer pRows.Close()
+		for pRows.Next() {
+			var p models.Product
+			if err := pRows.Scan(&p.ID, &p.StoreID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.ImageURL, &p.CreatedAt); err == nil {
+				data.Products = append(data.Products, p)
+			}
+		}
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	err = s.tmpl.ExecuteTemplate(c.Writer, "dashboard_products", data)
+	if err != nil {
+		log.Printf("dashboardProductsGet render error: %v", err)
+	}
+}
+
+func (s *Server) dashboardProductsPost(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	_ = c.Request.ParseForm()
+	storeIDStr := c.PostForm("store_id")
+	name := strings.TrimSpace(c.PostForm("name"))
+	desc := strings.TrimSpace(c.PostForm("description"))
+	priceStr := c.PostForm("price")
+	stockStr := c.PostForm("stock")
+	img := strings.TrimSpace(c.PostForm("image_url"))
+
+	var storeID int
+	if err := s.pool.QueryRow(c.Request.Context(), "SELECT id FROM stores WHERE id = $1 AND user_id = $2", storeIDStr, uid).Scan(&storeID); err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_store")
+		return
+	}
+
+	var price float64
+	if p, err := strconv.ParseFloat(priceStr, 64); err == nil {
+		price = p
+	}
+
+	var stock int
+	if st, err := strconv.Atoi(stockStr); err == nil {
+		stock = st
+	}
+
+	_, err := s.pool.Exec(c.Request.Context(),
+		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, $6)`,
+		storeID, name, desc, price, stock, img,
+	)
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=create_failed")
+		return
+	}
+
+	c.Redirect(http.StatusSeeOther, "/dashboard/products")
+}
+
+func (s *Server) dashboardProductDelete(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || productID < 1 {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
+		return
+	}
+
+	// Ensure the product belongs to a store owned by the user
+	var storeID int64
+	err = s.pool.QueryRow(c.Request.Context(), `
+		SELECT s.id 
+		FROM products p
+		JOIN stores s ON p.store_id = s.id
+		WHERE p.id = $1 AND s.user_id = $2
+	`, productID, uid).Scan(&storeID)
+	
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=not_found")
+		return
+	}
+
+	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM products WHERE id = $1", productID); err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=delete_failed")
+		return
+	}
+
+	c.Redirect(http.StatusSeeOther, "/dashboard/products")
+}
+
+func (s *Server) dashboardStoresGet(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	data := dashboardData{
+		LoggedIn:           true,
+		Token:              true,
+		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
+		ActiveNav:          "stores",
+		Title:              "Stores",
+	}
+
+	rows, err := s.pool.Query(c.Request.Context(),
+		`SELECT id, user_id, name, subdomain, description, status, created_at
+		 FROM stores
+		 WHERE user_id = $1
+		 ORDER BY id DESC`,
+		uid,
+	)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var st models.Store
+			if err := rows.Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt); err == nil {
+				data.Stores = append(data.Stores, st)
+			}
+		}
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(c.Writer, "dashboard_stores", data); err != nil {
+		log.Printf("dashboardStoresGet render error: %v", err)
 	}
 }

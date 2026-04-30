@@ -53,6 +53,10 @@ type storeThemeBody struct {
 	Preset       string  `json:"preset"`
 	Rounding     float64 `json:"rounding"`
 	Version      int     `json:"version"`
+	PageBg       string  `json:"page_bg"`
+	TextColor    string  `json:"text_color"`
+	CardBg       string  `json:"card_bg"`
+	FooterBg     string  `json:"footer_bg"`
 }
 
 type storeThemeUpdateBody struct {
@@ -63,6 +67,10 @@ type storeThemeUpdateBody struct {
 	Preset       *string  `json:"preset"`
 	Rounding     *float64 `json:"rounding"`
 	Version      *int     `json:"version"`
+	PageBg       *string  `json:"page_bg"`
+	TextColor    *string  `json:"text_color"`
+	CardBg       *string  `json:"card_bg"`
+	FooterBg     *string  `json:"footer_bg"`
 }
 
 type cartAddBody struct {
@@ -195,6 +203,10 @@ func defaultStoreTheme() models.StoreTheme {
 		Preset:       "minimal",
 		Rounding:     0.5,
 		Version:      1,
+		PageBg:       "#ffffff",
+		TextColor:    "#111111",
+		CardBg:       "#ffffff",
+		FooterBg:     "transparent",
 	}
 	t.Normalize()
 	return t
@@ -265,6 +277,13 @@ func normalizeStoreTheme(in storeThemeBody) (models.StoreTheme, error) {
 	out.Preset = in.Preset
 	out.Rounding = in.Rounding
 	out.Version = in.Version
+
+	// Phase 2: Design Tokens
+	out.PageBg = in.PageBg
+	out.TextColor = in.TextColor
+	out.CardBg = in.CardBg
+	out.FooterBg = in.FooterBg
+
 	out.Normalize()
 
 	return out, nil
@@ -308,6 +327,21 @@ func normalizeStoreThemePatch(curr models.StoreTheme, patch storeThemeUpdateBody
 	if patch.Version != nil {
 		out.Version = *patch.Version
 	}
+
+	// Phase 2: Design Tokens
+	if patch.PageBg != nil {
+		out.PageBg = *patch.PageBg
+	}
+	if patch.TextColor != nil {
+		out.TextColor = *patch.TextColor
+	}
+	if patch.CardBg != nil {
+		out.CardBg = *patch.CardBg
+	}
+	if patch.FooterBg != nil {
+		out.FooterBg = *patch.FooterBg
+	}
+
 	out.Normalize()
 
 	return out, nil

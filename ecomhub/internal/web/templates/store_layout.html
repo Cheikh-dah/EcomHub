@@ -1,0 +1,46 @@
+{{define "store_layout"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{template "head_meta" .}}
+  <title>{{.Store.Name}} · {{block "title" .}}{{end}}</title>
+</head>
+<body class="storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --rounding: {{.Theme.Rounding}}">
+  {{template "store_header" .}}
+
+  <main class="store-container">
+    {{if .Product}}
+      {{template "store_product_content" .}}
+    {{else if .Lines}}
+      {{template "store_cart_content" .}}
+    {{else}}
+      {{template "store_home_content" .}}
+    {{end}}
+  </main>
+
+  {{template "store_footer" .}}
+</body>
+</html>
+{{end}}
+
+{{define "store_header"}}
+<header class="site-header {{with .Theme}}{{if .PrimaryColor}}themed{{end}}{{end}}" {{with .Theme}}{{if .PrimaryColor}}style="background: {{.PrimaryColor}}"{{end}}{{end}}>
+  <a class="brand" href="/s/{{.Store.Subdomain}}">
+    {{$name := .Store.Name}}
+    {{if and .Theme .Theme.LogoURL}}
+      <img src="{{.Theme.LogoURL}}" alt="{{$name}}">
+    {{else}}
+      {{$name}}
+    {{end}}
+  </a>
+  <nav>
+    <a href="/s/{{.Store.Subdomain}}">Home</a>
+    <a href="/s/{{.Store.Subdomain}}#products">Products</a>
+    <a href="/s/{{.Store.Subdomain}}/cart">Cart</a>
+  </nav>
+</header>
+{{end}}
+
+{{define "store_footer"}}
+<footer class="site-footer">© {{.Store.Name}}</footer>
+{{end}}
