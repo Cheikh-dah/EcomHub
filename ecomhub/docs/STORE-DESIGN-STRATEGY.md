@@ -116,7 +116,32 @@ To prevent poor designs:
 - **Rule**: AI outputs DNA data, NOT CSS.
 - **Note**: This phase is kept for future development to focus on a robust manual foundation first.
 
-### Phase 4 — Platform Expansion
+### ✅ Safety & Constraints
+
+### 1. Protection by Defaults
+Every design input is validated and clamped to safe ranges.
+- **Rounding**: Clamped between `0.0` and `1.0`.
+- **Presets**: Validated against allowed values (`minimal`, `luxury`, `playful`).
+- **Automatic Repair**: Invalid or missing values are automatically repaired to sensible defaults.
+
+### 2. Scoped Styling
+All theme styles are isolated within the `.storefront` class.
+- Prevents "Theme Leakage" into the dashboard or checkout pages.
+- Allows for easy extension of global platform styles without breaking individual stores.
+
+---
+
+## 🕰️ Backward Compatibility
+
+Existing stores are protected by defaults and normalization:
+
+1. **Defaults**: Stores without a configuration automatically inherit the "Minimal" preset with medium rounding.
+2. **Sanitization**: Old configuration data is automatically repaired upon first load/save.
+3. **Variable Bridge**: Legacy CSS variables are mapped to new DNA tokens to ensure consistent rendering.
+
+---
+
+## 🚀 Roadmap:
 - **Gallery**: Browse community and official presets.
 - **Industry Templates**: Fashion (Luxury), Tech (Minimal), Food (Artisan).
 - **A/B Testing**: Test which theme converts better.
