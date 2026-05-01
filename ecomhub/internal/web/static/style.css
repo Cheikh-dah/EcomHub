@@ -94,14 +94,21 @@ textarea:focus {
   gap: 1rem;
 }
 
-body.app .site-header,
+/* Default EcomHub/platform pages */
+body:not(.storefront) .site-header {
+  background: #111111;
+  color: #ffffff;
+}
+
+/* Dashboard */
 body.dashboard-body .site-header {
   background: #111111;
   color: #ffffff;
 }
 
+/* Storefront only */
 body.storefront .site-header {
-  background: var(--store-primary, #111111);
+  background: var(--store-primary, var(--primary-color, #111111));
   color: #ffffff;
   transition: background-color 0.25s ease;
 }
