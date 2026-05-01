@@ -193,7 +193,7 @@
       </div>
       <div class="studio-actions">
         <button type="button" id="te-reset" class="secondary">Reset</button>
-        <button type="button" id="te-save" class="primary">Save draft</button>
+        <button type="button" id="te-save" class="primary">Save changes</button>
         <button type="button" id="te-publish" class="publish">Publish theme</button>
       </div>
       <div class="status-row"><span id="te-status" class="muted"></span></div>
@@ -361,6 +361,7 @@
     updateContrastHint();
     updatePresetCards();
     applyIframePreview();
+    setStatus('Previewing unsaved changes', false);
   }
 
   function setStatus(msg, isErr) {

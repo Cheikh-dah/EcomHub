@@ -628,11 +628,13 @@ code {
 
 .real-store-preview-shell {
   width: 100%;
-  height: 80vh;
-  border-radius: 12px;
+  height: calc(100vh - 120px);
+  min-height: 640px;
+  border-radius: 16px;
   overflow: hidden;
   background: #0f172a;
   border: 1px solid #263244;
+  box-shadow: 0 30px 100px rgba(0,0,0,.45);
 }
 
 .real-store-preview-frame {
