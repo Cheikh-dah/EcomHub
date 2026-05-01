@@ -117,7 +117,25 @@ textarea:focus {
 .storefront .site-footer {
   background: var(--footer-bg, transparent);
   padding: 1.5rem 1.75rem;
-  margin-top: 2rem;
+}
+
+.store-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.store-main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 32px;
+  box-sizing: border-box;
+  flex: 1 0 auto;
+}
+
+.store-footer {
+  margin-top: auto;
 }
 
 h1 {

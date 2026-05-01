@@ -5,10 +5,10 @@
   {{template "head_meta" .}}
   <title>{{.Store.Name}} · {{block "title" .}}{{end}}</title>
 </head>
-<body class="storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --rounding: {{.Theme.Rounding}}">
+<body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --rounding: {{.Theme.Rounding}}">
   {{template "store_header" .}}
 
-  <main class="store-container">
+  <main class="store-main">
     {{if .Product}}
       {{template "store_product_content" .}}
     {{else if .Lines}}
@@ -42,5 +42,5 @@
 {{end}}
 
 {{define "store_footer"}}
-<footer class="site-footer">© {{.Store.Name}}</footer>
+<footer class="site-footer store-footer">© {{.Store.Name}}</footer>
 {{end}}
