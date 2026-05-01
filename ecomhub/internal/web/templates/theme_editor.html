@@ -139,6 +139,10 @@
           <p class="theme-preview-label">Live preview</p>
           <h3>Storefront live preview</h3>
         </div>
+        <div class="preview-toggle">
+          <button id="btnDesktop" class="toggle-btn active">Desktop</button>
+          <button id="btnMobile" class="toggle-btn">Mobile</button>
+        </div>
         <p class="panel-copy">Instantly preview the real storefront with unsaved theme changes.</p>
       </div>
 
@@ -447,6 +451,24 @@
   [elPrimary, elAccent, elPageBg, elTextColor, elCardBg, elFooterBg].forEach(function (input) {
     if (input) input.addEventListener('input', applyIframePreview);
   });
+
+  // Preview mode toggle
+  var btnDesktop = document.getElementById('btnDesktop');
+  var btnMobile = document.getElementById('btnMobile');
+
+  if (btnDesktop && btnMobile) {
+    btnDesktop.addEventListener('click', function () {
+      iframe.classList.remove('mobile-mode');
+      btnDesktop.classList.add('active');
+      btnMobile.classList.remove('active');
+    });
+
+    btnMobile.addEventListener('click', function () {
+      iframe.classList.add('mobile-mode');
+      btnMobile.classList.add('active');
+      btnDesktop.classList.remove('active');
+    });
+  }
 
   if (elFixContrast) {
     elFixContrast.addEventListener('click', function () {
