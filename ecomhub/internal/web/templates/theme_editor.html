@@ -145,6 +145,23 @@
     </aside>
 
     <section class="theme-preview" id="te-preview">
+      <div class="preview-toolbar">
+        <div>
+          <p class="theme-preview-label">Live preview</p>
+          <h3>Storefront live preview</h3>
+        </div>
+        <p class="panel-copy">Instantly preview the real storefront with unsaved theme changes.</p>
+      </div>
+
+      <div class="real-store-preview-shell">
+        <iframe
+          id="storePreviewFrame"
+          class="real-store-preview-frame"
+          src="/s/{{.Store.Subdomain}}"
+          title="Real storefront preview">
+        </iframe>
+      </div>
+    </section>
   </div>
 </main>
 {{template "footer" .}}
@@ -253,7 +270,6 @@
       cardBg: elCardBg.value,
       footerBg: elFooterBg.value,
       logo: elLogo.value,
-      preset: elPreset.value,
       rounding: elRounding.value,
       layout: selectedLayout()
     };
@@ -269,13 +285,10 @@
     var cardBg = elCardBgHex.value.trim();
     var footerBg = elFooterBgHex.value.trim();
     var logo = elLogo.value.trim();
-    var preset = elPreset.value;
     var rounding = elRounding.value;
 
-    // Apply DNA colors if not overridden by hex (for preview simplicity we show preset impact)
-    var pColors = getPresetColors(preset);
-    elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : pColors.primary);
-    elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : pColors.accent);
+    elPreview.style.setProperty('--theme-primary', isHex(primary) ? primary : '#111111');
+    elPreview.style.setProperty('--theme-accent', isHex(accent) ? accent : '#000000');
     elPreview.style.setProperty('--theme-page-bg', isHex(pageBg) ? pageBg : '#ffffff');
     elPreview.style.setProperty('--theme-text-color', isHex(textColor) ? textColor : '#111111');
     elPreview.style.setProperty('--theme-card-bg', isHex(cardBg) ? cardBg : '#f9fafb');
@@ -286,7 +299,6 @@
     elRoundingVal.textContent = parseFloat(rounding).toFixed(1);
 
     updateContrastHint();
-    updatePresetCards();
     applyIframePreview();
     setStatus('Previewing unsaved changes', false);
   }
@@ -350,20 +362,14 @@
     applyPreview();
   });
 
-  elLogo.addEventListener('input', applyPreview);
-  elPreset.addEventListener('change', function () {
-    updatePresetCards();
-    applyPreview();
-  });
-  elRounding.addEventListener('input', applyPreview);
+  if (elLogo) {
+    elLogo.addEventListener('input', applyPreview);
+  }
+  if (elRounding) {
+    elRounding.addEventListener('input', applyPreview);
+  }
   Array.prototype.forEach.call(layoutRadios, function (radio) {
     radio.addEventListener('change', applyPreview);
-  });
-
-  presetCards.forEach(function (card) {
-    card.addEventListener('click', function () {
-      applyPresetValues(card.dataset.preset);
-    });
   });
 
   var iframe = document.getElementById('storePreviewFrame');
@@ -441,7 +447,6 @@
         footer_bg: footerBg,
         logo_url: logo,
         layout_preset: selectedLayout(),
-        preset: elPreset.value,
         rounding: parseFloat(elRounding.value)
       })
     })
@@ -466,38 +471,42 @@
     });
   }
 
-  elSave.addEventListener('click', function () {
-    saveTheme('Saved!');
-  });
-
-  elPublish.addEventListener('click', function () {
-    saveTheme('Published!');
-  });
-
-  elReset.addEventListener('click', function () {
-    elPrimary.value = themeInitialState.primary;
-    elPrimaryHex.value = themeInitialState.primary;
-    elAccent.value = themeInitialState.accent;
-    elAccentHex.value = themeInitialState.accent;
-    elPageBg.value = themeInitialState.pageBg;
-    elPageBgHex.value = themeInitialState.pageBg;
-    elTextColor.value = themeInitialState.textColor;
-    elTextColorHex.value = themeInitialState.textColor;
-    elCardBg.value = themeInitialState.cardBg;
-    elCardBgHex.value = themeInitialState.cardBg;
-    elFooterBg.value = themeInitialState.footerBg;
-    elFooterBgHex.value = themeInitialState.footerBg;
-    elLogo.value = themeInitialState.logo;
-    elPreset.value = themeInitialState.preset;
-    elRounding.value = themeInitialState.rounding;
-    elRoundingVal.textContent = parseFloat(themeInitialState.rounding).toFixed(1);
-    Array.prototype.forEach.call(layoutRadios, function (radio) {
-      radio.checked = radio.value === themeInitialState.layout;
+  if (elSave) {
+    elSave.addEventListener('click', function () {
+      saveTheme('Saved!');
     });
-    updatePresetCards();
-    applyPreview();
-    setStatus('Reset to current theme', false);
-  });
+  }
+
+  if (elPublish) {
+    elPublish.addEventListener('click', function () {
+      saveTheme('Published!');
+    });
+  }
+
+  if (elReset) {
+    elReset.addEventListener('click', function () {
+      elPrimary.value = themeInitialState.primary;
+      elPrimaryHex.value = themeInitialState.primary;
+      elAccent.value = themeInitialState.accent;
+      elAccentHex.value = themeInitialState.accent;
+      elPageBg.value = themeInitialState.pageBg;
+      elPageBgHex.value = themeInitialState.pageBg;
+      elTextColor.value = themeInitialState.textColor;
+      elTextColorHex.value = themeInitialState.textColor;
+      elCardBg.value = themeInitialState.cardBg;
+      elCardBgHex.value = themeInitialState.cardBg;
+      elFooterBg.value = themeInitialState.footerBg;
+      elFooterBgHex.value = themeInitialState.footerBg;
+      elLogo.value = themeInitialState.logo;
+      elRounding.value = themeInitialState.rounding;
+      elRoundingVal.textContent = parseFloat(themeInitialState.rounding).toFixed(1);
+      Array.prototype.forEach.call(layoutRadios, function (radio) {
+        radio.checked = radio.value === themeInitialState.layout;
+      });
+      applyPreview();
+      setStatus('Reset to current theme', false);
+    });
+  }
 
   applyPreview();
 })();
