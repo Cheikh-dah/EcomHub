@@ -5,14 +5,20 @@
   {{template "head_meta" .}}
   <title>Theme Editor · {{.Store.Name}} · EcomHub</title>
 </head>
-<body>
-{{template "header" .}}
-<main class="container theme-editor">
-  <p class="crumb"><a href="/dashboard">&larr; Dashboard</a></p>
-  <h1>Theme Editor</h1>
-  <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
+<body class="dashboard-body">
+  <main class="dashboard-main">
+    <header class="dashboard-main-header">
+      <div>
+        <h1>Theme Editor</h1>
+        <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
+      </div>
+      <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </header>
+    <div class="dashboard-content">
+      <div class="container theme-editor">
+        <p class="crumb"><a href="/dashboard">&larr; Dashboard</a></p>
 
-  <div class="theme-studio">
+        <div class="theme-studio">
     <aside class="theme-panel theme-controls">
       <div class="panel-head">
         <p class="panel-eyebrow">Store Design Studio</p>
@@ -162,8 +168,9 @@
       </div>
     </section>
   </div>
-</main>
-{{template "footer" .}}
+      </div>
+    </div>
+  </main>
 
 <script>
 (function () {
