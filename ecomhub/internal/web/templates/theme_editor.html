@@ -12,7 +12,7 @@
   <h1>Theme Editor</h1>
   <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
 
-  <div class="theme-editor">
+  <div class="theme-studio">
     <aside class="theme-panel theme-controls">
       <div class="panel-head">
         <p class="panel-eyebrow">Store Design Studio</p>
@@ -142,16 +142,18 @@
         <p class="panel-copy">Instantly preview the real storefront with unsaved theme changes.</p>
       </div>
 
-      <div class="store-preview-shell">
-        <div class="preview-browser-bar">
+      <div class="real-store-preview-shell">
+        <div class="real-store-preview-bar">
+          <span class="preview-dot"></span>
           <span>/s/{{.Store.Subdomain}}</span>
+          <a href="/s/{{.Store.Subdomain}}" target="_blank" rel="noopener">Open full page</a>
         </div>
 
         <iframe
           id="storePreviewFrame"
-          class="store-preview-frame"
+          class="real-store-preview-frame"
           src="/s/{{.Store.Subdomain}}"
-          title="Storefront preview">
+          title="Real storefront preview">
         </iframe>
       </div>
     </section>
