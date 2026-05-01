@@ -5,7 +5,7 @@
   {{template "head_meta" .}}
   <title>{{.Store.Name}} · {{block "title" .}}{{end}}</title>
 </head>
-<body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --rounding: {{.Theme.Rounding}}">
+<body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --store-primary: {{.Theme.PrimaryColor}}; --store-accent: {{.Theme.AccentColor}}; --store-bg: {{.Theme.PageBg}}; --store-text: {{.Theme.TextColor}}; --store-card: {{.Theme.CardBg}}; --store-footer: {{.Theme.FooterBg}}; --rounding: {{.Theme.Rounding}}">
   {{template "store_header" .}}
 
   <main class="store-main">
@@ -24,7 +24,7 @@
 {{end}}
 
 {{define "store_header"}}
-<header class="site-header {{with .Theme}}{{if .PrimaryColor}}themed{{end}}{{end}}" {{with .Theme}}{{if .PrimaryColor}}style="background: {{.PrimaryColor}}"{{end}}{{end}}>
+<header class="site-header {{with .Theme}}{{if .PrimaryColor}}themed{{end}}{{end}}">
   <a class="brand" href="/s/{{.Store.Subdomain}}">
     {{$name := .Store.Name}}
     {{if and .Theme .Theme.LogoURL}}
