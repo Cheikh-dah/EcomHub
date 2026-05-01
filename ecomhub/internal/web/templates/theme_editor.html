@@ -22,8 +22,8 @@
 
       <div class="panel-section">
         <div class="section-title">
-          <span>Brand colors</span>
-          <p>Choose the primary identity colors and logo that set the tone for your storefront.</p>
+          <span>Brand</span>
+          <p>Choose the primary identity colors that set the tone for your storefront.</p>
         </div>
 
         <label class="field">
@@ -40,12 +40,6 @@
             <input type="color" id="te-accent" value="{{.Theme.AccentColor}}">
             <input type="text" id="te-accent-hex" class="hex-input" value="{{.Theme.AccentColor}}" maxlength="7" placeholder="#00ba7c">
           </div>
-        </label>
-
-        <label class="field">
-          <span>Logo URL</span>
-          <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
-          <small class="field-note">Optional storefront logo for the preview header.</small>
         </label>
       </div>
 
@@ -92,13 +86,26 @@
             <input type="color" id="te-text-color" value="{{.Theme.TextColor}}">
             <input type="text" id="te-text-color-hex" class="hex-input" value="{{.Theme.TextColor}}" maxlength="7" placeholder="#111111">
           </div>
-          <div id="te-contrast-hint" class="contrast-warning hidden">Low contrast — this may be hard to read.</div>
+          <div id="te-contrast-hint" class="contrast-warning hidden">⚠ Low contrast — text may be hard to read. <button type="button" id="te-fix-contrast" class="contrast-fix-btn">Fix automatically</button></div>
         </label>
       </div>
 
       <div class="panel-section">
         <div class="section-title">
-          <span>Components</span>
+          <span>Assets</span>
+          <p>Upload or link a storefront logo to personalize the preview.</p>
+        </div>
+
+        <label class="field">
+          <span>Logo URL</span>
+          <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
+          <small class="field-note">Optional storefront logo for the preview header.</small>
+        </label>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Layout</span>
           <p>Control corner radius and preview layout style for cards and buttons.</p>
         </div>
 
@@ -130,43 +137,22 @@
       <div class="preview-toolbar">
         <div>
           <p class="theme-preview-label">Live preview</p>
-          <h3>Storefront mobile mockup</h3>
+          <h3>Storefront live preview</h3>
         </div>
-        <p class="panel-copy">See your store design in context with a polished phone preview.</p>
+        <p class="panel-copy">Instantly preview the real storefront with unsaved theme changes.</p>
       </div>
 
-      <div class="preview-shell">
-        <div class="preview-phone">
-          <div class="phone-notch"></div>
-          <div class="preview-screen">
-            <header class="preview-header">
-              <div class="preview-brand">
-                <img id="te-preview-logo" src="" alt="" class="theme-preview-logo">
-                <span id="te-preview-name">{{.Store.Name}}</span>
-              </div>
-              <span class="preview-status">Open store</span>
-            </header>
-
-            <section class="preview-hero">
-              <p class="eyebrow">Featured</p>
-              <h4>Fresh picks for today</h4>
-              <p class="preview-hero-text">A premium storefront design with modern spacing, typography and clean visual hierarchy.</p>
-            </section>
-
-            <article class="theme-preview-card {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}" id="te-preview-card">
-              <div class="preview-img-placeholder"></div>
-              <div class="preview-card-body">
-                <p class="preview-product-name">Sample product</p>
-                <p class="preview-product-price">$29.00</p>
-                <button class="theme-preview-button" type="button">Add to cart</button>
-              </div>
-            </article>
-
-            <div class="theme-preview-footer" id="te-preview-footer">
-              Free shipping on orders over $50
-            </div>
-          </div>
+      <div class="store-preview-shell">
+        <div class="preview-browser-bar">
+          <span>/s/{{.Store.Subdomain}}</span>
         </div>
+
+        <iframe
+          id="storePreviewFrame"
+          class="store-preview-frame"
+          src="/s/{{.Store.Subdomain}}"
+          title="Storefront preview">
+        </iframe>
       </div>
     </section>
 
@@ -176,19 +162,23 @@
         <p>Pick a starting point and refine it from the studio.</p>
       </div>
       <div class="preset-grid">
-        <button type="button" class="preset-card" data-preset="minimal"> 
+        <button type="button" class="preset-card" data-preset="minimal">
+          <div class="preset-swatch preset-swatch-minimal"></div>
           <h4>Minimal</h4>
           <p>Clean, modern and calm.</p>
         </button>
         <button type="button" class="preset-card" data-preset="luxury">
+          <div class="preset-swatch preset-swatch-luxury"></div>
           <h4>Luxury</h4>
           <p>Elegant, polished and refined.</p>
         </button>
         <button type="button" class="preset-card" data-preset="playful">
+          <div class="preset-swatch preset-swatch-playful"></div>
           <h4>Playful</h4>
           <p>Bold, bright and energetic.</p>
         </button>
         <button type="button" class="preset-card" data-preset="dark">
+          <div class="preset-swatch preset-swatch-dark"></div>
           <h4>Dark</h4>
           <p>Rich, moody and immersive.</p>
         </button>
@@ -237,13 +227,11 @@
   var elReset = document.getElementById('te-reset');
   var elStatus = document.getElementById('te-status');
   var elPreview = document.getElementById('te-preview');
-  var elPreviewLogo = document.getElementById('te-preview-logo');
-  var elPreviewName = document.getElementById('te-preview-name');
-  var elPreviewCard = document.getElementById('te-preview-card');
   var elPreset = document.getElementById('te-preset');
   var elRounding = document.getElementById('te-rounding');
   var elRoundingVal = document.getElementById('te-rounding-val');
   var elContrastHint = document.getElementById('te-contrast-hint');
+  var elFixContrast = document.getElementById('te-fix-contrast');
   var presetCards = document.querySelectorAll('.preset-card');
   var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
 
@@ -303,6 +291,36 @@
     });
   }
 
+  function applyPresetValues(preset) {
+    var presetColors = getPresetColors(preset);
+    elPrimary.value = presetColors.primary;
+    elPrimaryHex.value = presetColors.primary;
+    elAccent.value = presetColors.accent;
+    elAccentHex.value = presetColors.accent;
+    elPreset.value = preset;
+    updatePresetCards();
+    applyPreview();
+  }
+
+  function bestTextColor(backgroundHex) {
+    var whiteContrast = contrastRatio(backgroundHex, '#ffffff');
+    var blackContrast = contrastRatio(backgroundHex, '#000000');
+    return whiteContrast >= blackContrast ? '#ffffff' : '#000000';
+  }
+
+  function applyIframePreview() {
+    var iframe = document.getElementById('storePreviewFrame');
+    if (!iframe || !iframe.contentDocument) return;
+
+    var root = iframe.contentDocument.documentElement;
+    root.style.setProperty('--store-primary', elPrimary.value);
+    root.style.setProperty('--store-accent', elAccent.value);
+    root.style.setProperty('--store-bg', elPageBg.value);
+    root.style.setProperty('--store-text', elTextColor.value);
+    root.style.setProperty('--store-card', elCardBg.value);
+    root.style.setProperty('--store-footer', elFooterBg.value);
+  }
+
   function initialThemeState() {
     return {
       primary: elPrimary.value,
@@ -346,22 +364,7 @@
 
     updateContrastHint();
     updatePresetCards();
-
-    if (logo) {
-      elPreviewLogo.src = logo;
-      elPreviewLogo.style.display = 'block';
-      elPreviewName.style.display = 'none';
-    } else {
-      elPreviewLogo.removeAttribute('src');
-      elPreviewLogo.style.display = 'none';
-      elPreviewName.style.display = 'inline';
-    }
-
-    if (selectedLayout() === 'compact') {
-      elPreviewCard.classList.add('compact');
-    } else {
-      elPreviewCard.classList.remove('compact');
-    }
+    applyIframePreview();
   }
 
   function setStatus(msg, isErr) {
@@ -435,11 +438,29 @@
 
   presetCards.forEach(function (card) {
     card.addEventListener('click', function () {
-      elPreset.value = card.dataset.preset;
-      updatePresetCards();
-      applyPreview();
+      applyPresetValues(card.dataset.preset);
     });
   });
+
+  var iframe = document.getElementById('storePreviewFrame');
+  if (iframe) {
+    iframe.addEventListener('load', applyIframePreview);
+  }
+
+  [elPrimary, elAccent, elPageBg, elTextColor, elCardBg, elFooterBg].forEach(function (input) {
+    if (input) input.addEventListener('input', applyIframePreview);
+  });
+
+  if (elFixContrast) {
+    elFixContrast.addEventListener('click', function () {
+      if (isHex(elPageBgHex.value)) {
+        var best = bestTextColor(elPageBgHex.value);
+        elTextColor.value = best;
+        elTextColorHex.value = best;
+        applyPreview();
+      }
+    });
+  }
 
   function saveTheme(successText) {
     var primary = elPrimaryHex.value.trim();
