@@ -131,61 +131,6 @@
           </div>
         </label>
       </div>
-    </aside>
-
-    <section class="theme-preview" id="te-preview">
-      <div class="preview-toolbar">
-        <div>
-          <p class="theme-preview-label">Live preview</p>
-          <h3>Storefront live preview</h3>
-        </div>
-        <p class="panel-copy">Instantly preview the real storefront with unsaved theme changes.</p>
-      </div>
-
-      <div class="real-store-preview-shell">
-        <iframe
-          id="storePreviewFrame"
-          class="real-store-preview-frame"
-          src="/s/{{.Store.Subdomain}}"
-          title="Real storefront preview">
-        </iframe>
-      </div>
-    </section>
-
-    <aside class="theme-panel theme-right-panel">
-      <div class="section-title">
-        <span>Theme presets</span>
-        <p>Pick a starting point and refine it from the studio.</p>
-      </div>
-      <div class="preset-grid">
-        <button type="button" class="preset-card" data-preset="minimal">
-          <div class="preset-swatch preset-swatch-minimal"></div>
-          <h4>Minimal</h4>
-          <p>Clean, modern and calm.</p>
-        </button>
-        <button type="button" class="preset-card" data-preset="luxury">
-          <div class="preset-swatch preset-swatch-luxury"></div>
-          <h4>Luxury</h4>
-          <p>Elegant, polished and refined.</p>
-        </button>
-        <button type="button" class="preset-card" data-preset="playful">
-          <div class="preset-swatch preset-swatch-playful"></div>
-          <h4>Playful</h4>
-          <p>Bold, bright and energetic.</p>
-        </button>
-        <button type="button" class="preset-card" data-preset="dark">
-          <div class="preset-swatch preset-swatch-dark"></div>
-          <h4>Dark</h4>
-          <p>Rich, moody and immersive.</p>
-        </button>
-      </div>
-
-      <select id="te-preset" class="hidden" aria-hidden="true">
-        <option value="minimal" {{if eq .Theme.Preset "minimal"}}selected{{end}}>Minimal (Clean & Modern)</option>
-        <option value="luxury" {{if eq .Theme.Preset "luxury"}}selected{{end}}>Luxury (Elegant & High-end)</option>
-        <option value="playful" {{if eq .Theme.Preset "playful"}}selected{{end}}>Playful (Bold & Vibrant)</option>
-        <option value="dark" {{if eq .Theme.Preset "dark"}}selected{{end}}>Dark (Moody & Immersive)</option>
-      </select>
 
       <div class="section-title" style="margin-top: 2rem;">
         <span>Actions</span>
@@ -198,6 +143,8 @@
       </div>
       <div class="status-row"><span id="te-status" class="muted"></span></div>
     </aside>
+
+    <section class="theme-preview" id="te-preview">
   </div>
 </main>
 {{template "footer" .}}
@@ -223,12 +170,10 @@
   var elReset = document.getElementById('te-reset');
   var elStatus = document.getElementById('te-status');
   var elPreview = document.getElementById('te-preview');
-  var elPreset = document.getElementById('te-preset');
   var elRounding = document.getElementById('te-rounding');
   var elRoundingVal = document.getElementById('te-rounding-val');
   var elContrastHint = document.getElementById('te-contrast-hint');
   var elFixContrast = document.getElementById('te-fix-contrast');
-  var presetCards = document.querySelectorAll('.preset-card');
   var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
 
   function isHex(v) {
@@ -240,15 +185,6 @@
       if (layoutRadios[i].checked) return layoutRadios[i].value;
     }
     return 'default';
-  }
-
-  function getPresetColors(preset) {
-    switch(preset) {
-      case 'luxury': return { primary: '#1a1a1a', accent: '#c9a96e' };
-      case 'playful': return { primary: '#7c3aed', accent: '#f97316' };
-      case 'dark': return { primary: '#0f172a', accent: '#818cf8' };
-      default: return { primary: '#111111', accent: '#2563eb' };
-    }
   }
 
   function hexChannel(value) {
@@ -281,23 +217,6 @@
     }
   }
 
-  function updatePresetCards() {
-    presetCards.forEach(function (card) {
-      card.classList.toggle('selected', card.dataset.preset === elPreset.value);
-    });
-  }
-
-  function applyPresetValues(preset) {
-    var presetColors = getPresetColors(preset);
-    elPrimary.value = presetColors.primary;
-    elPrimaryHex.value = presetColors.primary;
-    elAccent.value = presetColors.accent;
-    elAccentHex.value = presetColors.accent;
-    elPreset.value = preset;
-    updatePresetCards();
-    applyPreview();
-  }
-
   function bestTextColor(backgroundHex) {
     var whiteContrast = contrastRatio(backgroundHex, '#ffffff');
     var blackContrast = contrastRatio(backgroundHex, '#000000');
@@ -305,16 +224,24 @@
   }
 
   function applyIframePreview() {
-    var iframe = document.getElementById('storePreviewFrame');
-    if (!iframe || !iframe.contentDocument) return;
+    const iframe = document.getElementById("storePreviewFrame");
+    if (!iframe) return;
 
-    var root = iframe.contentDocument.documentElement;
-    root.style.setProperty('--store-primary', elPrimary.value);
-    root.style.setProperty('--store-accent', elAccent.value);
-    root.style.setProperty('--store-bg', elPageBg.value);
-    root.style.setProperty('--store-text', elTextColor.value);
-    root.style.setProperty('--store-card', elCardBg.value);
-    root.style.setProperty('--store-footer', elFooterBg.value);
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    if (!doc || !doc.documentElement) return;
+
+    const root = doc.documentElement;
+
+    root.style.setProperty("--store-primary", elPrimary.value);
+    root.style.setProperty("--store-accent", elAccent.value);
+    root.style.setProperty("--store-bg", elPageBg.value);
+    root.style.setProperty("--store-text", elTextColor.value);
+    root.style.setProperty("--store-card", elCardBg.value);
+    root.style.setProperty("--store-footer", elFooterBg.value);
+
+    if (doc.body) {
+      doc.body.classList.add("preview-mode");
+    }
   }
 
   function initialThemeState() {

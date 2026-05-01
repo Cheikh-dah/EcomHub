@@ -437,7 +437,7 @@ code {
 
 .theme-studio {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  grid-template-columns: 320px 1fr;
   gap: 24px;
   align-items: start;
   margin-top: 1.5rem;
@@ -808,72 +808,6 @@ code {
 
 .theme-right-panel .section-title {
   margin-top: 0;
-}
-
-.preset-grid {
-  display: grid;
-  gap: 0.85rem;
-  margin-top: 1rem;
-}
-
-.preset-card {
-  display: block;
-  width: 100%;
-  padding: 1rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--card);
-  color: var(--fg);
-  text-align: left;
-  transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  cursor: pointer;
-}
-
-.preset-swatch {
-  height: 10px;
-  width: 100%;
-  border-radius: 999px;
-  margin-bottom: 0.85rem;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--primary) 100%);
-}
-
-.preset-swatch-minimal {
-  background: linear-gradient(90deg, #2563eb 0%, #111111 100%);
-}
-
-.preset-swatch-luxury {
-  background: linear-gradient(90deg, #c9a96e 0%, #1a1a1a 100%);
-}
-
-.preset-swatch-playful {
-  background: linear-gradient(90deg, #f97316 0%, #7c3aed 100%);
-}
-
-.preset-swatch-dark {
-  background: linear-gradient(90deg, #818cf8 0%, #0f172a 100%);
-}
-
-.preset-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--accent);
-  box-shadow: 0 14px 32px rgba(0,0,0,0.08);
-}
-
-.preset-card.selected {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(37,99,235,0.12);
-}
-
-.preset-card h4 {
-  margin: 0 0 0.35rem;
-  font-size: 1rem;
-}
-
-.preset-card p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
 .studio-actions {
