@@ -20,7 +20,7 @@ EcomHub allows merchants to customize the appearance of their storefronts throug
 1. Merchant navigates to **Dashboard** → click "theme editor" link next to store name
 2. Theme Editor page loads with:
    - **Controls panel** (left): Color pickers (HTML5 `<input type="color">`) + hex input fields, logo URL input, layout toggle
-   - **Preview panel** (right): Live card preview showing how changes look in real time
+   - **Preview panel** (right): Real storefront iframe with live CSS variable injection, plus a local preview surface for quick UI feedback
 3. Merchant adjusts colors/logo/layout, sees preview update instantly
 4. Clicks "Save theme" button
 5. Changes persist to database and apply immediately on storefront
@@ -53,15 +53,21 @@ Requires authenticated user. Handled by `Server.apiUpdateStoreTheme()` in `handl
 {
   "primary_color": "#1d9bf0",
   "accent_color": "#00ba7c",
+  "page_bg": "#ffffff",
+  "text_color": "#111111",
+  "card_bg": "#f9fafb",
+  "footer_bg": "#ffffff",
   "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default"
+  "layout_preset": "default",
+  "rounding": 0.4
 }
 ```
 
 - All fields are optional (patch semantics)
-- Colors must be valid hex (#RRGGBB)
-- Logo URL must be absolute HTTPS or HTTP URL
-- Layout preset must be `default` or `compact`
+- `primary_color`, `accent_color`, `page_bg`, `text_color`, `card_bg`, `footer_bg` must be valid hex (#RRGGBB) or omitted
+- `logo_url` must be an absolute HTTP(S) URL or omitted
+- `layout_preset` must be `default` or `compact` or omitted
+- `rounding` must be a number between `0.0` and `1.0` or omitted
 
 **Response (200 OK):**
 
@@ -69,8 +75,15 @@ Requires authenticated user. Handled by `Server.apiUpdateStoreTheme()` in `handl
 {
   "primary_color": "#1d9bf0",
   "accent_color": "#00ba7c",
+  "page_bg": "#ffffff",
+  "text_color": "#111111",
+  "card_bg": "#f9fafb",
+  "footer_bg": "#ffffff",
   "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default"
+  "layout_preset": "default",
+  "rounding": 0.4,
+  "preset": "minimal",
+  "version": 1
 }
 ```
 
@@ -80,10 +93,17 @@ Requires authenticated user. Handled by `Server.apiUpdateStoreTheme()` in `handl
 
 ```go
 type StoreTheme struct {
-	PrimaryColor string `json:"primary_color"`
-	AccentColor  string `json:"accent_color"`
-	LogoURL      string `json:"logo_url,omitempty"`
-	LayoutPreset string `json:"layout_preset"`
+	PrimaryColor string  `json:"primary_color"`
+	AccentColor  string  `json:"accent_color"`
+	LogoURL      string  `json:"logo_url,omitempty"`
+	LayoutPreset string  `json:"layout_preset"`
+	Preset       string  `json:"preset"`
+	Rounding     float64 `json:"rounding"`
+	Version      int     `json:"version"`
+	PageBg       string  `json:"page_bg"`
+	TextColor    string  `json:"text_color"`
+	CardBg       string  `json:"card_bg"`
+	FooterBg     string  `json:"footer_bg"`
 }
 ```
 
@@ -99,25 +119,37 @@ ALTER TABLE stores ADD COLUMN theme_config JSONB NOT NULL DEFAULT '{"primary_col
 
 #### Storefront CSS Application
 
-Store pages (`store_home.html`, `store_product.html`, `store_cart.html`) read theme via template context:
+Store pages use a storefront-specific body class and inline CSS variables via template context:
 
 ```html
-<style>
-  :root {
-    --primary-color: {{.Theme.PrimaryColor}};
-    --accent-color: {{.Theme.AccentColor}};
-  }
-</style>
+<body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --store-primary: {{.Theme.PrimaryColor}}; --store-accent: {{.Theme.AccentColor}}; --store-bg: {{.Theme.PageBg}}; --store-text: {{.Theme.TextColor}}; --store-card: {{.Theme.CardBg}}; --store-footer: {{.Theme.FooterBg}}; --rounding: {{.Theme.Rounding}}">
 ```
 
-CSS variables cascade to product cards, buttons, links, etc.
+This keeps storefront theme styles scoped to the `.storefront` body context and prevents dashboard header leakage.
+
+#### Storefront header scoping
+
+The storefront header is styled using store-scoped variables:
+
+```css
+body.storefront .site-header,
+body.storefront .site-header.themed {
+  background: var(--store-primary, var(--primary-color, #111111));
+}
+```
+
+The theme editor's live preview injection writes both scoped and fallback variables into the iframe root:
+
+```js
+root.style.setProperty("--store-primary", primary);
+root.style.setProperty("--primary-color", primary);
+```
+
+That makes the storefront header update instantly in the preview while keeping dashboard styles separate.
 
 #### Dynamic Header Branding
 
-The storefront header (`layout.html`) dynamically adjusts based on the theme:
-- **Logo**: If `LogoURL` is present, it displays the image.
-- **Store Name**: If no logo is set, it displays the store name as text.
-- **Platform Fallback**: If the page is accessed without a store context (e.g., the hub marketplace), it falls back to "EcomHub".
+The storefront header (`layout.html`) displays the store logo when available, otherwise it renders the store name as text. Theme colors are applied through scoped CSS variables rather than inline background styling.
 
 This is implemented using Go template `{{with}}` blocks to safely handle missing data:
 ```html

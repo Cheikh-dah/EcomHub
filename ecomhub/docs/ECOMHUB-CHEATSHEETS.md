@@ -294,7 +294,7 @@ Let merchants safely customize a storefront's basic visual identity without intr
 
 1. **Backend core:** persist `theme_config`, validate values, expose authenticated read/update endpoints.
 2. **Dashboard editor:** add a merchant-only theme editor page under `/dashboard/stores/{id}/theme`.
-3. **Live preview:** use vanilla JS + CSS variables for instant preview with no build step.
+3. **Live preview:** use vanilla JS + CSS variables to inject theme values into the real storefront iframe, keeping dashboard and storefront styles isolated.
 4. **Storefront application:** apply saved theme values to storefront templates once the editor workflow is stable.
 
 ### Technical approach
