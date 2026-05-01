@@ -431,7 +431,7 @@ code {
 
 .theme-studio {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(700px, 1fr) minmax(240px, 280px);
+  grid-template-columns: 280px 1fr 260px;
   gap: 24px;
   align-items: start;
   margin-top: 1.5rem;
@@ -628,43 +628,16 @@ code {
 
 .real-store-preview-shell {
   width: 100%;
-  height: 720px;
-  border-radius: 18px;
+  height: 80vh;
+  border-radius: 12px;
   overflow: hidden;
   background: #0f172a;
   border: 1px solid #263244;
-  box-shadow: 0 24px 80px rgba(0,0,0,.35);
-}
-
-.real-store-preview-bar {
-  height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  background: #111827;
-  color: #9ca3af;
-  font-size: 13px;
-  border-bottom: 1px solid #263244;
-}
-
-.real-store-preview-bar a {
-  margin-left: auto;
-  color: #38bdf8;
-  text-decoration: none;
-  font-weight: 700;
-}
-
-.preview-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #22c55e;
 }
 
 .real-store-preview-frame {
   width: 100%;
-  height: calc(100% - 42px);
+  height: 100%;
   border: 0;
   background: white;
 }
