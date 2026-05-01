@@ -6,7 +6,7 @@
 {{end}}
 
 {{define "header"}}
-<header class="site-header {{with .Theme}}{{if .PrimaryColor}}themed{{end}}{{end}}">
+<header class="site-header">
   <a class="brand" href="{{if and .Store .Store.Subdomain}}/s/{{.Store.Subdomain}}{{else}}/{{end}}">
     {{$name := "EcomHub"}}
     {{if and .Store .Store.Name}}{{$name = .Store.Name}}{{end}}

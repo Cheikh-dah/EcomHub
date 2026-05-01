@@ -76,8 +76,11 @@ textarea:focus {
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border);
-  background: #111111;
-  color: #ffffff;
+}
+
+.site-header a,
+.site-header .brand {
+  color: inherit;
 }
 
 .brand {
@@ -89,6 +92,18 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+body.app .site-header,
+body.dashboard-body .site-header {
+  background: #111111;
+  color: #ffffff;
+}
+
+body.storefront .site-header {
+  background: var(--store-primary, #111111);
+  color: #ffffff;
+  transition: background-color 0.25s ease;
 }
 
 .container {
@@ -975,9 +990,8 @@ body.storefront {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-body.storefront .site-header,
-body.storefront .site-header.themed {
-  background: var(--store-primary, var(--primary-color, #111111));
+body.storefront .site-header {
+  background: var(--store-primary, #111111);
   transition: background-color 0.25s ease;
 }
 
@@ -1047,17 +1061,7 @@ body.storefront .search-form button {
   font-size: 0.95rem;
 }
 
-/* Theme-aware Header */
-.site-header.themed {
-  border-bottom: none;
-  color: #fff;
-}
-
-.site-header.themed a {
-  color: #fff;
-}
-
-.site-header.themed .brand img {
+.site-header .brand img {
   max-height: 32px;
   vertical-align: middle;
 }
