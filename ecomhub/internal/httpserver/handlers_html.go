@@ -720,7 +720,7 @@ func (s *Server) dashboardProductDelete(c *gin.Context) {
 		JOIN stores s ON p.store_id = s.id
 		WHERE p.id = $1 AND s.user_id = $2
 	`, productID, uid).Scan(&storeID)
-	
+
 	if err != nil {
 		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=not_found")
 		return
