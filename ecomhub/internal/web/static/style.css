@@ -76,7 +76,7 @@ textarea:focus {
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border);
-  background: var(--primary-color, #111111);
+  background: #111111;
   color: #ffffff;
 }
 
