@@ -1,3 +1,23 @@
+# Environment
 .env
+
+# Build outputs
 bin/
 *.exe
+*.out
+
+# Temp / runtime
+**/tmp/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Go cache (optional safety)
+*.test
+coverage.out
