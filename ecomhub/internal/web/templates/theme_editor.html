@@ -134,12 +134,11 @@
 
       <div class="section-title" style="margin-top: 2rem;">
         <span>Actions</span>
-        <p>Save changes, publish your theme, or reset the studio to the current storefront style.</p>
+        <p>Save changes or reset the studio to the current storefront style.</p>
       </div>
       <div class="studio-actions">
         <button type="button" id="te-reset" class="secondary">Reset</button>
         <button type="button" id="te-save" class="primary">Save changes</button>
-        <button type="button" id="te-publish" class="publish">Publish theme</button>
       </div>
       <div class="status-row"><span id="te-status" class="muted"></span></div>
     </aside>
@@ -183,7 +182,6 @@
   var elFooterBgHex = document.getElementById('te-footer-bg-hex');
   var elLogo = document.getElementById('te-logo');
   var elSave = document.getElementById('te-save');
-  var elPublish = document.getElementById('te-publish');
   var elReset = document.getElementById('te-reset');
   var elStatus = document.getElementById('te-status');
   var elPreview = document.getElementById('te-preview');
@@ -249,12 +247,41 @@
 
     const root = doc.documentElement;
 
-    root.style.setProperty("--store-primary", elPrimary.value);
-    root.style.setProperty("--store-accent", elAccent.value);
-    root.style.setProperty("--store-bg", elPageBg.value);
-    root.style.setProperty("--store-text", elTextColor.value);
-    root.style.setProperty("--store-card", elCardBg.value);
-    root.style.setProperty("--store-footer", elFooterBg.value);
+    var primary = elPrimaryHex.value.trim();
+    var accent = elAccentHex.value.trim();
+    var pageBg = elPageBgHex.value.trim();
+    var textColor = elTextColorHex.value.trim();
+    var cardBg = elCardBgHex.value.trim();
+    var footerBg = elFooterBgHex.value.trim();
+    var rounding = elRounding ? elRounding.value.trim() : '';
+
+    if (isHex(primary)) {
+      root.style.setProperty("--store-primary", primary);
+      root.style.setProperty("--primary-color", primary);
+    }
+    if (isHex(accent)) {
+      root.style.setProperty("--store-accent", accent);
+      root.style.setProperty("--accent-color", accent);
+    }
+    if (isHex(pageBg)) {
+      root.style.setProperty("--store-bg", pageBg);
+      root.style.setProperty("--page-bg", pageBg);
+    }
+    if (isHex(textColor)) {
+      root.style.setProperty("--store-text", textColor);
+      root.style.setProperty("--text-color", textColor);
+    }
+    if (isHex(cardBg)) {
+      root.style.setProperty("--store-card", cardBg);
+      root.style.setProperty("--card-bg", cardBg);
+    }
+    if (isHex(footerBg)) {
+      root.style.setProperty("--store-footer", footerBg);
+      root.style.setProperty("--footer-bg", footerBg);
+    }
+    if (rounding !== '') {
+      root.style.setProperty("--rounding", rounding);
+    }
 
     if (doc.body) {
       doc.body.classList.add("preview-mode");
@@ -431,8 +458,7 @@
     }
 
     elSave.disabled = true;
-    elPublish.disabled = true;
-    setStatus('Saving...', false);
+
 
     fetch('/api/stores/' + storeID + '/theme', {
       method: 'PUT',
@@ -460,6 +486,10 @@
     })
     .then(function () {
       setStatus(successText, false);
+      var previewFrame = document.getElementById('storePreviewFrame');
+      if (previewFrame && previewFrame.contentWindow) {
+        previewFrame.contentWindow.location.reload();
+      }
       window.setTimeout(function () { setStatus('', false); }, 3000);
     })
     .catch(function (err) {
@@ -467,19 +497,12 @@
     })
     .finally(function () {
       elSave.disabled = false;
-      elPublish.disabled = false;
     });
   }
 
   if (elSave) {
     elSave.addEventListener('click', function () {
       saveTheme('Saved!');
-    });
-  }
-
-  if (elPublish) {
-    elPublish.addEventListener('click', function () {
-      saveTheme('Published!');
     });
   }
 
