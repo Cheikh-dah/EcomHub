@@ -13,117 +13,205 @@
   <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
 
   <div class="theme-editor">
-    <section class="theme-controls stack-form">
-      <label>
-        Primary color
-        <div class="color-row">
-          <input type="color" id="te-primary" value="{{.Theme.PrimaryColor}}">
-          <input type="text" id="te-primary-hex" class="hex-input" value="{{.Theme.PrimaryColor}}" maxlength="7" placeholder="#1d9bf0">
+    <aside class="theme-panel theme-controls">
+      <div class="panel-head">
+        <p class="panel-eyebrow">Store Design Studio</p>
+        <h2>Theme controls</h2>
+        <p class="panel-copy">Customize brand, surfaces, typography and component style with an instant storefront preview.</p>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Brand colors</span>
+          <p>Choose the primary identity colors and logo that set the tone for your storefront.</p>
         </div>
-      </label>
 
-      <label>
-        Accent color
-        <div class="color-row">
-          <input type="color" id="te-accent" value="{{.Theme.AccentColor}}">
-          <input type="text" id="te-accent-hex" class="hex-input" value="{{.Theme.AccentColor}}" maxlength="7" placeholder="#00ba7c">
-        </div>
-      </label>
-
-      <label>
-        Page background
-        <div class="color-row">
-          <input type="color" id="te-page-bg" value="{{.Theme.PageBg}}">
-          <input type="text" id="te-page-bg-hex" class="hex-input" value="{{.Theme.PageBg}}" maxlength="7" placeholder="#ffffff">
-        </div>
-      </label>
-
-      <label>
-        Text color
-        <div class="color-row">
-          <input type="color" id="te-text-color" value="{{.Theme.TextColor}}">
-          <input type="text" id="te-text-color-hex" class="hex-input" value="{{.Theme.TextColor}}" maxlength="7" placeholder="#111111">
-        </div>
-      </label>
-
-      <label>
-        Card background
-        <div class="color-row">
-          <input type="color" id="te-card-bg" value="{{.Theme.CardBg}}">
-          <input type="text" id="te-card-bg-hex" class="hex-input" value="{{.Theme.CardBg}}" maxlength="7" placeholder="#f9fafb">
-        </div>
-      </label>
-
-      <label>
-        Footer background
-        <div class="color-row">
-          <input type="color" id="te-footer-bg" value="{{.Theme.FooterBg}}">
-          <input type="text" id="te-footer-bg-hex" class="hex-input" value="{{.Theme.FooterBg}}" maxlength="7" placeholder="#ffffff">
-        </div>
-      </label>
-
-      <label>
-        Logo URL
-        <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
-      </label>
-
-      <hr style="width: 100%; border: 0; border-top: 1px solid var(--border); margin: 0.5rem 0;">
-
-      <label>
-        Brand Preset
-        <select id="te-preset" class="logo-input">
-          <option value="minimal" {{if eq .Theme.Preset "minimal"}}selected{{end}}>Minimal (Clean & Modern)</option>
-          <option value="luxury" {{if eq .Theme.Preset "luxury"}}selected{{end}}>Luxury (Elegant & High-end)</option>
-          <option value="playful" {{if eq .Theme.Preset "playful"}}selected{{end}}>Playful (Bold & Vibrant)</option>
-        </select>
-      </label>
-
-      <label>
-        Corner Rounding
-        <div style="display: flex; align-items: center; gap: 1rem; width: 100%; max-width: 420px;">
-          <input type="range" id="te-rounding" min="0" max="1" step="0.1" value="{{.Theme.Rounding}}" style="flex: 1; margin: 0;">
-          <span id="te-rounding-val" style="font-family: monospace; width: 2.5rem; text-align: right;">{{.Theme.Rounding}}</span>
-        </div>
-      </label>
-
-      <label>Layout preset</label>
-      <div class="layout-toggle">
-        <label class="toggle-opt">
-          <input type="radio" name="layout_preset" value="default" {{if ne .Theme.LayoutPreset "compact"}}checked{{end}}>
-          Default
+        <label class="field">
+          <span>Primary color</span>
+          <div class="color-row">
+            <input type="color" id="te-primary" value="{{.Theme.PrimaryColor}}">
+            <input type="text" id="te-primary-hex" class="hex-input" value="{{.Theme.PrimaryColor}}" maxlength="7" placeholder="#1d9bf0">
+          </div>
         </label>
-        <label class="toggle-opt">
-          <input type="radio" name="layout_preset" value="compact" {{if eq .Theme.LayoutPreset "compact"}}checked{{end}}>
-          Compact
+
+        <label class="field">
+          <span>Accent color</span>
+          <div class="color-row">
+            <input type="color" id="te-accent" value="{{.Theme.AccentColor}}">
+            <input type="text" id="te-accent-hex" class="hex-input" value="{{.Theme.AccentColor}}" maxlength="7" placeholder="#00ba7c">
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Logo URL</span>
+          <input type="url" id="te-logo" class="logo-input" value="{{.Theme.LogoURL}}" placeholder="https://example.com/logo.png">
+          <small class="field-note">Optional storefront logo for the preview header.</small>
         </label>
       </div>
 
-      <div class="theme-actions">
-        <button id="te-save">Save theme</button>
-        <span id="te-status" class="muted"></span>
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Surfaces</span>
+          <p>Fine-tune page, card and footer surfaces for a coherent storefront palette.</p>
+        </div>
+
+        <label class="field">
+          <span>Page background</span>
+          <div class="color-row">
+            <input type="color" id="te-page-bg" value="{{.Theme.PageBg}}">
+            <input type="text" id="te-page-bg-hex" class="hex-input" value="{{.Theme.PageBg}}" maxlength="7" placeholder="#ffffff">
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Card background</span>
+          <div class="color-row">
+            <input type="color" id="te-card-bg" value="{{.Theme.CardBg}}">
+            <input type="text" id="te-card-bg-hex" class="hex-input" value="{{.Theme.CardBg}}" maxlength="7" placeholder="#f9fafb">
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Footer background</span>
+          <div class="color-row">
+            <input type="color" id="te-footer-bg" value="{{.Theme.FooterBg}}">
+            <input type="text" id="te-footer-bg-hex" class="hex-input" value="{{.Theme.FooterBg}}" maxlength="7" placeholder="#ffffff">
+          </div>
+        </label>
       </div>
-    </section>
+
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Typography</span>
+          <p>Set readable text color for body content and storefront copy.</p>
+        </div>
+
+        <label class="field">
+          <span>Text color</span>
+          <div class="color-row">
+            <input type="color" id="te-text-color" value="{{.Theme.TextColor}}">
+            <input type="text" id="te-text-color-hex" class="hex-input" value="{{.Theme.TextColor}}" maxlength="7" placeholder="#111111">
+          </div>
+          <div id="te-contrast-hint" class="contrast-warning hidden">Low contrast — this may be hard to read.</div>
+        </label>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">
+          <span>Components</span>
+          <p>Control corner radius and preview layout style for cards and buttons.</p>
+        </div>
+
+        <label class="field">
+          <span>Corner rounding</span>
+          <div class="range-row">
+            <input type="range" id="te-rounding" min="0" max="1" step="0.1" value="{{.Theme.Rounding}}">
+            <span id="te-rounding-val">{{.Theme.Rounding}}</span>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Layout preset</span>
+          <div class="layout-toggle">
+            <label class="toggle-opt">
+              <input type="radio" name="layout_preset" value="default" {{if ne .Theme.LayoutPreset "compact"}}checked{{end}}>
+              Default
+            </label>
+            <label class="toggle-opt">
+              <input type="radio" name="layout_preset" value="compact" {{if eq .Theme.LayoutPreset "compact"}}checked{{end}}>
+              Compact
+            </label>
+          </div>
+        </label>
+      </div>
+    </aside>
 
     <section class="theme-preview" id="te-preview">
-      <p class="theme-preview-label">Preview</p>
-
-      <div class="theme-preview-header" id="te-preview-header">
-        <img id="te-preview-logo" src="" alt="" class="theme-preview-logo">
-        <span id="te-preview-name">{{.Store.Name}}</span>
+      <div class="preview-toolbar">
+        <div>
+          <p class="theme-preview-label">Live preview</p>
+          <h3>Storefront mobile mockup</h3>
+        </div>
+        <p class="panel-copy">See your store design in context with a polished phone preview.</p>
       </div>
 
-      <div class="theme-preview-card {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}" id="te-preview-card">
-        <div class="preview-img-placeholder"></div>
-        <div class="preview-card-body">
-          <p class="preview-product-name">Sample product</p>
-          <p class="preview-product-price">$29.00</p>
-          <button class="theme-preview-button" type="button">Add to cart</button>
+      <div class="preview-shell">
+        <div class="preview-phone">
+          <div class="phone-notch"></div>
+          <div class="preview-screen">
+            <header class="preview-header">
+              <div class="preview-brand">
+                <img id="te-preview-logo" src="" alt="" class="theme-preview-logo">
+                <span id="te-preview-name">{{.Store.Name}}</span>
+              </div>
+              <span class="preview-status">Open store</span>
+            </header>
+
+            <section class="preview-hero">
+              <p class="eyebrow">Featured</p>
+              <h4>Fresh picks for today</h4>
+              <p class="preview-hero-text">A premium storefront design with modern spacing, typography and clean visual hierarchy.</p>
+            </section>
+
+            <article class="theme-preview-card {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}" id="te-preview-card">
+              <div class="preview-img-placeholder"></div>
+              <div class="preview-card-body">
+                <p class="preview-product-name">Sample product</p>
+                <p class="preview-product-price">$29.00</p>
+                <button class="theme-preview-button" type="button">Add to cart</button>
+              </div>
+            </article>
+
+            <div class="theme-preview-footer" id="te-preview-footer">
+              Free shipping on orders over $50
+            </div>
+          </div>
         </div>
       </div>
-      <div class="theme-preview-footer" id="te-preview-footer">
-        Footer preview
-      </div>
     </section>
+
+    <aside class="theme-panel theme-right-panel">
+      <div class="section-title">
+        <span>Theme presets</span>
+        <p>Pick a starting point and refine it from the studio.</p>
+      </div>
+      <div class="preset-grid">
+        <button type="button" class="preset-card" data-preset="minimal"> 
+          <h4>Minimal</h4>
+          <p>Clean, modern and calm.</p>
+        </button>
+        <button type="button" class="preset-card" data-preset="luxury">
+          <h4>Luxury</h4>
+          <p>Elegant, polished and refined.</p>
+        </button>
+        <button type="button" class="preset-card" data-preset="playful">
+          <h4>Playful</h4>
+          <p>Bold, bright and energetic.</p>
+        </button>
+        <button type="button" class="preset-card" data-preset="dark">
+          <h4>Dark</h4>
+          <p>Rich, moody and immersive.</p>
+        </button>
+      </div>
+
+      <select id="te-preset" class="hidden" aria-hidden="true">
+        <option value="minimal" {{if eq .Theme.Preset "minimal"}}selected{{end}}>Minimal (Clean & Modern)</option>
+        <option value="luxury" {{if eq .Theme.Preset "luxury"}}selected{{end}}>Luxury (Elegant & High-end)</option>
+        <option value="playful" {{if eq .Theme.Preset "playful"}}selected{{end}}>Playful (Bold & Vibrant)</option>
+        <option value="dark" {{if eq .Theme.Preset "dark"}}selected{{end}}>Dark (Moody & Immersive)</option>
+      </select>
+
+      <div class="section-title" style="margin-top: 2rem;">
+        <span>Actions</span>
+        <p>Save changes, publish your theme, or reset the studio to the current storefront style.</p>
+      </div>
+      <div class="studio-actions">
+        <button type="button" id="te-reset" class="secondary">Reset</button>
+        <button type="button" id="te-save" class="primary">Save draft</button>
+        <button type="button" id="te-publish" class="publish">Publish theme</button>
+      </div>
+      <div class="status-row"><span id="te-status" class="muted"></span></div>
+    </aside>
   </div>
 </main>
 {{template "footer" .}}
@@ -145,6 +233,8 @@
   var elFooterBgHex = document.getElementById('te-footer-bg-hex');
   var elLogo = document.getElementById('te-logo');
   var elSave = document.getElementById('te-save');
+  var elPublish = document.getElementById('te-publish');
+  var elReset = document.getElementById('te-reset');
   var elStatus = document.getElementById('te-status');
   var elPreview = document.getElementById('te-preview');
   var elPreviewLogo = document.getElementById('te-preview-logo');
@@ -153,6 +243,8 @@
   var elPreset = document.getElementById('te-preset');
   var elRounding = document.getElementById('te-rounding');
   var elRoundingVal = document.getElementById('te-rounding-val');
+  var elContrastHint = document.getElementById('te-contrast-hint');
+  var presetCards = document.querySelectorAll('.preset-card');
   var layoutRadios = document.querySelectorAll('input[name="layout_preset"]');
 
   function isHex(v) {
@@ -170,9 +262,63 @@
     switch(preset) {
       case 'luxury': return { primary: '#1a1a1a', accent: '#c9a96e' };
       case 'playful': return { primary: '#7c3aed', accent: '#f97316' };
+      case 'dark': return { primary: '#0f172a', accent: '#818cf8' };
       default: return { primary: '#111111', accent: '#2563eb' };
     }
   }
+
+  function hexChannel(value) {
+    return parseInt(value.slice(1, 3), 16) / 255;
+  }
+
+  function luminance(hex) {
+    var r = hexChannel(hex);
+    var g = parseInt(hex.slice(3, 5), 16) / 255;
+    var b = parseInt(hex.slice(5, 7), 16) / 255;
+    [r, g, b] = [r, g, b].map(function (c) {
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function contrastRatio(hexA, hexB) {
+    if (!isHex(hexA) || !isHex(hexB)) return 21;
+    var lumA = luminance(hexA);
+    var lumB = luminance(hexB);
+    return (Math.max(lumA, lumB) + 0.05) / (Math.min(lumA, lumB) + 0.05);
+  }
+
+  function updateContrastHint() {
+    if (isHex(elPageBgHex.value) && isHex(elTextColorHex.value)) {
+      var ratio = contrastRatio(elPageBgHex.value, elTextColorHex.value);
+      elContrastHint.className = ratio < 4.5 ? 'contrast-warning' : 'contrast-warning hidden';
+    } else {
+      elContrastHint.className = 'contrast-warning hidden';
+    }
+  }
+
+  function updatePresetCards() {
+    presetCards.forEach(function (card) {
+      card.classList.toggle('selected', card.dataset.preset === elPreset.value);
+    });
+  }
+
+  function initialThemeState() {
+    return {
+      primary: elPrimary.value,
+      accent: elAccent.value,
+      pageBg: elPageBg.value,
+      textColor: elTextColor.value,
+      cardBg: elCardBg.value,
+      footerBg: elFooterBg.value,
+      logo: elLogo.value,
+      preset: elPreset.value,
+      rounding: elRounding.value,
+      layout: selectedLayout()
+    };
+  }
+
+  var themeInitialState = initialThemeState();
 
   function applyPreview() {
     var primary = elPrimaryHex.value.trim();
@@ -197,6 +343,9 @@
     // Apply rounding
     elPreview.style.setProperty('--rounding', rounding);
     elRoundingVal.textContent = parseFloat(rounding).toFixed(1);
+
+    updateContrastHint();
+    updatePresetCards();
 
     if (logo) {
       elPreviewLogo.src = logo;
@@ -275,13 +424,24 @@
   });
 
   elLogo.addEventListener('input', applyPreview);
-  elPreset.addEventListener('change', applyPreview);
+  elPreset.addEventListener('change', function () {
+    updatePresetCards();
+    applyPreview();
+  });
   elRounding.addEventListener('input', applyPreview);
   Array.prototype.forEach.call(layoutRadios, function (radio) {
     radio.addEventListener('change', applyPreview);
   });
 
-  elSave.addEventListener('click', function () {
+  presetCards.forEach(function (card) {
+    card.addEventListener('click', function () {
+      elPreset.value = card.dataset.preset;
+      updatePresetCards();
+      applyPreview();
+    });
+  });
+
+  function saveTheme(successText) {
     var primary = elPrimaryHex.value.trim();
     var accent = elAccentHex.value.trim();
     var pageBg = elPageBgHex.value.trim();
@@ -320,6 +480,7 @@
     }
 
     elSave.disabled = true;
+    elPublish.disabled = true;
     setStatus('Saving...', false);
 
     fetch('/api/stores/' + storeID + '/theme', {
@@ -348,7 +509,7 @@
       return res.json();
     })
     .then(function () {
-      setStatus('Saved!', false);
+      setStatus(successText, false);
       window.setTimeout(function () { setStatus('', false); }, 3000);
     })
     .catch(function (err) {
@@ -356,7 +517,41 @@
     })
     .finally(function () {
       elSave.disabled = false;
+      elPublish.disabled = false;
     });
+  }
+
+  elSave.addEventListener('click', function () {
+    saveTheme('Saved!');
+  });
+
+  elPublish.addEventListener('click', function () {
+    saveTheme('Published!');
+  });
+
+  elReset.addEventListener('click', function () {
+    elPrimary.value = themeInitialState.primary;
+    elPrimaryHex.value = themeInitialState.primary;
+    elAccent.value = themeInitialState.accent;
+    elAccentHex.value = themeInitialState.accent;
+    elPageBg.value = themeInitialState.pageBg;
+    elPageBgHex.value = themeInitialState.pageBg;
+    elTextColor.value = themeInitialState.textColor;
+    elTextColorHex.value = themeInitialState.textColor;
+    elCardBg.value = themeInitialState.cardBg;
+    elCardBgHex.value = themeInitialState.cardBg;
+    elFooterBg.value = themeInitialState.footerBg;
+    elFooterBgHex.value = themeInitialState.footerBg;
+    elLogo.value = themeInitialState.logo;
+    elPreset.value = themeInitialState.preset;
+    elRounding.value = themeInitialState.rounding;
+    elRoundingVal.textContent = parseFloat(themeInitialState.rounding).toFixed(1);
+    Array.prototype.forEach.call(layoutRadios, function (radio) {
+      radio.checked = radio.value === themeInitialState.layout;
+    });
+    updatePresetCards();
+    applyPreview();
+    setStatus('Reset to current theme', false);
   });
 
   applyPreview();
