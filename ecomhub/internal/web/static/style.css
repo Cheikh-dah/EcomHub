@@ -1295,3 +1295,26 @@ body.storefront .search-form button {
   max-width: 1400px;
 }
 
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #ffffff !important;
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.btn:hover {
+  opacity: 0.9;
+  text-decoration: none;
+}
+
+.hub-cta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
