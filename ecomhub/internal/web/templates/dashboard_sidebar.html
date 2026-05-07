@@ -1,17 +1,11 @@
 {{define "dashboard_sidebar"}}
 <nav class="sidebar-nav">
-    <h2>
-        <a href="/dashboard" style="color: inherit; text-decoration: none;">EcomHub</a>
-    </h2>
-    
-    <ul>
-        <li><a href="/dashboard" class="{{if eq .ActiveNav "home"}}active{{end}}">Home</a></li>
-        <li><a href="/dashboard/stores" class="{{if eq .ActiveNav "stores"}}active{{end}}">Stores</a></li>
-        <li><a href="/dashboard/products" class="{{if eq .ActiveNav "products"}}active{{end}}">Products</a></li>
-        <li><a href="/dashboard/orders" class="{{if eq .ActiveNav "orders"}}active{{end}}">Orders</a></li>
-        <li style="height: 1px; background: var(--border); margin: 1rem 0;"></li>
-        <li><a href="/dashboard/analytics" class="{{if eq .ActiveNav "analytics"}}active{{end}}">Analytics</a></li>
-        <li><a href="/dashboard/settings" class="{{if eq .ActiveNav "settings"}}active{{end}}">Settings</a></li>
-    </ul>
+    <a href="/" class="dashboard-brand">EcomHub</a>
+
+    <div class="dashboard-nav">
+        <a href="/dashboard" class="dashboard-nav-link {{if eq .ActiveNav "home"}}active{{end}}">Home</a>
+        <a href="/dashboard/stores" class="dashboard-nav-link {{if eq .ActiveNav "stores"}}active{{end}}">Stores</a>
+        <a href="/dashboard/products" class="dashboard-nav-link {{if eq .ActiveNav "products"}}active{{end}}">Products</a>
+    </div>
 </nav>
 {{end}}

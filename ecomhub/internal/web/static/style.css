@@ -1147,23 +1147,26 @@ body.storefront .search-form button {
   overflow-y: auto;
 }
 
-.dashboard-sidebar h2 {
+.dashboard-brand {
+  display: inline-flex;
+  color: var(--fg);
   font-size: 1.25rem;
   font-weight: 700;
-  margin-bottom: 2rem;
-  color: var(--fg);
+  margin-bottom: var(--space-6);
+  text-decoration: none;
 }
 
-.dashboard-sidebar ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.dashboard-brand:hover {
+  text-decoration: none;
+}
+
+.dashboard-nav {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.dashboard-sidebar ul li a {
+.dashboard-nav-link {
   display: block;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
@@ -1173,12 +1176,12 @@ body.storefront .search-form button {
   font-weight: 500;
 }
 
-.dashboard-sidebar ul li a:hover {
+.dashboard-nav-link:hover {
   background: var(--color-surface-muted);
   color: var(--fg);
 }
 
-.dashboard-sidebar ul li a.active {
+.dashboard-nav-link.active {
   background: var(--color-primary);
   color: #fff;
 }
