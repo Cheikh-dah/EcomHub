@@ -3,14 +3,14 @@
 <html lang="en">
 <head>
   {{template "head_meta" .}}
-  <title>Theme Editor · {{.Store.Name}} · EcomHub</title>
+  <title>Theme Editor - {{.Store.Name}} - EcomHub</title>
 </head>
 <body class="dashboard-body" data-logged-in="true">
   <main class="dashboard-main">
     <header class="dashboard-main-header">
       <div>
         <h1>Theme Editor</h1>
-        <p class="muted"><strong>{{.Store.Name}}</strong> · <code>{{.Store.Subdomain}}</code></p>
+        <p class="muted"><strong>{{.Store.Name}}</strong> - <code>{{.Store.Subdomain}}</code></p>
       </div>
       <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
     </header>
@@ -92,7 +92,7 @@
             <input type="color" id="te-text-color" value="{{.Theme.TextColor}}">
             <input type="text" id="te-text-color-hex" class="hex-input" value="{{.Theme.TextColor}}" maxlength="7" placeholder="#111111">
           </div>
-          <div id="te-contrast-hint" class="contrast-warning hidden">⚠ Low contrast — text may be hard to read. <button type="button" id="te-fix-contrast" class="contrast-fix-btn">Fix automatically</button></div>
+          <div id="te-contrast-hint" class="contrast-warning hidden">Warning: Low contrast - text may be hard to read. <button type="button" id="te-fix-contrast" class="contrast-fix-btn">Fix automatically</button></div>
         </label>
       </div>
 

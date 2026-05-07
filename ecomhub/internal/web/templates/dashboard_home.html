@@ -43,12 +43,18 @@
         <div class="stores-grid">
             {{range .Stores}}
                 <div class="card store-card">
-                    <h3 class="card-title">{{.Name}}</h3>
-                    <p class="card-muted">{{.Subdomain}}.ecomhub.com</p>
-                    <p>{{.Description}}</p>
+                    <div class="store-card-header">
+                        <h3 class="card-title">{{.Name}}</h3>
+                    </div>
+                    <p class="store-domain">{{.Subdomain}}.ecomhub.com</p>
+                    {{if .Description}}
+                        <p class="store-description">{{.Description}}</p>
+                    {{else}}
+                        <p class="store-description is-muted">No description provided.</p>
+                    {{end}}
                     <div class="store-actions">
                         <a href="/s/{{.Subdomain}}" target="_blank" class="btn btn-secondary">View Store</a>
-                        <a href="/dashboard/stores/{{.ID}}/theme" class="btn btn-primary">Edit Theme</a>
+                        <a href="/dashboard/stores/{{.ID}}/theme" class="btn btn-secondary">Edit Theme</a>
                     </div>
                 </div>
             {{end}}

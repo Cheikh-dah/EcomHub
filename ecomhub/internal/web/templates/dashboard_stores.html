@@ -1,12 +1,14 @@
 {{define "dashboard_stores"}}
 {{template "dashboard_header" .}}
     {{if .Error}}
-        <div class="error-msg" style="color: var(--error); margin-bottom: 1rem;">{{.Error}}</div>
+        <div class="error-msg">{{.Error}}</div>
     {{end}}
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-        <h2 style="margin: 0;">Your Stores</h2>
-        <!-- Future: Add 'Create Store' button here if we separate creation from home -->
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">Your Stores</h2>
+            <p class="page-description">Manage storefronts, preview customer pages, and tune each store theme.</p>
+        </div>
     </div>
 
     {{if not .Stores}}
@@ -14,26 +16,23 @@
             <p>You haven't created any stores yet. Create one from the Quick Actions panel.</p>
         </div>
     {{else}}
-        <div class="stores-grid" style="display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+        <div class="stores-grid">
             {{range .Stores}}
                 <div class="card store-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                        <h3 style="margin: 0;">{{.Name}}</h3>
-                        <span style="font-size: 0.8rem; padding: 0.2rem 0.5rem; background: var(--success); color: #fff; border-radius: 4px; text-transform: uppercase;">{{.Status}}</span>
+                    <div class="store-card-header">
+                        <h3 class="card-title">{{.Name}}</h3>
+                        <span class="store-status">{{.Status}}</span>
                     </div>
-                    
-                    <p style="color: var(--muted); margin-bottom: 1rem; font-family: monospace;">{{.Subdomain}}.ecomhub.com</p>
-                    
+                    <p class="store-domain">{{.Subdomain}}.ecomhub.com</p>
                     {{if .Description}}
-                        <p style="margin-bottom: 1.5rem; font-size: 0.95rem;">{{.Description}}</p>
+                        <p class="store-description">{{.Description}}</p>
                     {{else}}
-                        <p style="color: var(--muted); margin-bottom: 1.5rem; font-size: 0.95rem; font-style: italic;">No description provided.</p>
+                        <p class="store-description is-muted">No description provided.</p>
                     {{end}}
-                    
-                    <div class="store-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <a href="/s/{{.Subdomain}}" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">View Store</a>
-                        <a href="/dashboard/stores/{{.ID}}/theme" class="btn btn-secondary" style="flex: 1; text-align: center;">Edit Theme</a>
-                        <a href="/dashboard/products" class="btn btn-secondary" style="flex: 1; text-align: center;">Products</a>
+                    <div class="store-actions">
+                        <a href="/s/{{.Subdomain}}" target="_blank" class="btn btn-secondary">View Store</a>
+                        <a href="/dashboard/stores/{{.ID}}/theme" class="btn btn-secondary">Edit Theme</a>
+                        <a href="/dashboard/products" class="btn btn-secondary">Products</a>
                     </div>
                 </div>
             {{end}}
