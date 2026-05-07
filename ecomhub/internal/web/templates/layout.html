@@ -65,22 +65,54 @@
         await loadScript(origin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js', { 'data-clerk-publishable-key': pk });
         await Clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
 
+        const backendLoggedIn = document.body.dataset.loggedIn === 'true';
+        const nextParam = new URLSearchParams(window.location.search).get('next');
+        const nextPath = nextParam || (window.location.pathname + window.location.search);
+
+        async function syncBackendSession(session, shouldNavigate) {
+          if (!session) return false;
+          const t = await session.getToken();
+          if (!t) return false;
+
+          const res = await fetch('/dashboard/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_token: t, next: nextPath }),
+            credentials: 'same-origin'
+          });
+          if (!res.ok) return false;
+
+          if (shouldNavigate) {
+            const body = await res.json();
+            window.location.href = body.redirect || nextPath || '/dashboard';
+          }
+          return true;
+        }
+
         Clerk.addListener(async (em) => {
           if (!em.session) return;
-          const t = await em.session.getToken();
-          if (t) {
-            await fetch('/dashboard/session', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ session_token: t }),
-              credentials: 'same-origin'
-            });
-          }
+          await syncBackendSession(em.session, !backendLoggedIn);
         });
 
         const root = document.getElementById('clerk-signin-root');
+        if (Clerk.session && !backendLoggedIn) {
+          await syncBackendSession(Clerk.session, true);
+          return;
+        }
+
         if (!Clerk.isSignedIn && root) {
           Clerk.mountSignIn(root);
+        }
+
+        const logoutForm = document.getElementById('dashboard-logout-form');
+        if (logoutForm) {
+          logoutForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (Clerk.session) {
+              await Clerk.signOut();
+            }
+            logoutForm.submit();
+          });
         }
       } catch (e) { console.error('Clerk sync failed:', e); }
     }

@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="dashboard-body">
+<body class="dashboard-body" data-logged-in="{{if .Token}}true{{else}}false{{end}}">
     <div class="dashboard-grid">
         <!-- Sidebar -->
         <aside class="dashboard-sidebar">
@@ -25,7 +25,7 @@
                 <div class="user-meta">
                     {{if .Token}}
                         <span class="user-email">Merchant</span>
-                        <form action="/dashboard/logout" method="POST">
+                        <form action="/dashboard/logout" method="POST" id="dashboard-logout-form">
                             <button type="submit" class="logout-btn">Logout</button>
                         </form>
                     {{end}}
@@ -39,10 +39,12 @@
             </div>
         </main>
 
-        <!-- Quick Actions -->
-        <aside class="dashboard-actions">
-            {{template "dashboard_actions" .}}
-        </aside>
+        {{if .Token}}
+            <!-- Quick Actions -->
+            <aside class="dashboard-actions">
+                {{template "dashboard_actions" .}}
+            </aside>
+        {{end}}
     </div>
 
     {{template "clerk_sync" .}}

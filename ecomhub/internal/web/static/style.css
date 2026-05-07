@@ -1119,6 +1119,10 @@ body.storefront .search-form button {
   min-height: 100vh;
 }
 
+.dashboard-body[data-logged-in="false"] .dashboard-grid {
+  grid-template-columns: 240px 1fr;
+}
+
 .dashboard-body .page-header {
   display: flex;
   align-items: flex-start;
@@ -1336,6 +1340,18 @@ body.storefront .search-form button {
   max-width: 500px;
   margin: 4rem auto;
   text-align: center;
+}
+
+.auth-card {
+  max-width: 520px;
+  margin: 4rem auto;
+  text-align: center;
+}
+
+.clerk-signin-root {
+  margin-top: var(--space-5);
+  display: grid;
+  justify-content: center;
 }
 
 .onboarding-card h2 {

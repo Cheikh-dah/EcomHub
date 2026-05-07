@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"ecomhub/internal/auth"
@@ -36,7 +37,7 @@ func RequireAuthRedirect(pool *pgxpool.Pool, authorizedParties []string) gin.Han
 	return func(c *gin.Context) {
 		token := extractBearer(c)
 		if token == "" {
-			c.Redirect(http.StatusSeeOther, "/dashboard")
+			c.Redirect(http.StatusSeeOther, dashboardLoginPath(c))
 			c.Abort()
 			return
 		}
@@ -45,9 +46,17 @@ func RequireAuthRedirect(pool *pgxpool.Pool, authorizedParties []string) gin.Han
 			c.Next()
 			return
 		}
-		c.Redirect(http.StatusSeeOther, "/dashboard")
+		c.Redirect(http.StatusSeeOther, dashboardLoginPath(c))
 		c.Abort()
 	}
+}
+
+func dashboardLoginPath(c *gin.Context) string {
+	next := c.Request.URL.RequestURI()
+	if strings.TrimSpace(next) == "" {
+		next = "/dashboard"
+	}
+	return "/dashboard?next=" + url.QueryEscape(next)
 }
 
 func UserID(c *gin.Context) (uuid.UUID, bool) {

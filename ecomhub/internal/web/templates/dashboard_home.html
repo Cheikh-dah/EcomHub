@@ -4,7 +4,13 @@
         <div class="error-msg">{{.Error}}</div>
     {{end}}
 
-    {{if not .Stores}}
+    {{if not .LoggedIn}}
+        <div class="auth-card card">
+            <h2 class="card-title">Sign in to create your store</h2>
+            <p class="card-muted">Use your merchant account to create storefronts, add products, and manage your EcomHub presence.</p>
+            <div id="clerk-signin-root" class="clerk-signin-root"></div>
+        </div>
+    {{else if not .Stores}}
         <div class="onboarding-card card">
             <h2 class="card-title">Welcome to EcomHub!</h2>
             <p class="card-muted">It looks like you don't have a store yet. Let's change that.</p>
