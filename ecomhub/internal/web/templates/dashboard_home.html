@@ -22,7 +22,7 @@
                 <div class="form-group">
                     <label class="form-label">Subdomain</label>
                     <div class="form-inline">
-                        <input class="input" type="text" name="subdomain" required pattern="^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$" title="Letters, numbers, and hyphens only. No leading/trailing hyphens. Max 63 chars." placeholder="my-store">
+                        <input class="input" type="text" name="subdomain" data-subdomain-input required pattern="^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$" title="Letters, numbers, and hyphens only. No leading/trailing hyphens. Max 63 chars." placeholder="my-store">
                         <span class="form-suffix">.ecomhub.com</span>
                     </div>
                 </div>
@@ -60,5 +60,24 @@
             {{end}}
         </div>
     {{end}}
+    <script>
+    (function () {
+        var input = document.querySelector('[data-subdomain-input]');
+        if (!input) return;
+
+        input.addEventListener('input', function () {
+            var start = input.selectionStart;
+            var before = input.value;
+            var after = before.replace(/\s+/g, '-');
+
+            if (before === after) return;
+
+            input.value = after;
+            if (typeof start === 'number') {
+                input.setSelectionRange(start, start);
+            }
+        });
+    })();
+    </script>
 {{template "dashboard_footer" .}}
 {{end}}
