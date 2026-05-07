@@ -1,5 +1,5 @@
 {{define "store_cart_content"}}
-  <h1>Cart — {{.Store.Name}}</h1>
+  <h1>Cart - {{.Store.Name}}</h1>
   {{if .Err}}<p class="error">{{.Err}}</p>{{end}}
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
   {{if .Thanks}}<p class="success">Order placed (mock payment). Thank you!</p>{{end}}

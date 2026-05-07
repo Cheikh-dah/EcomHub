@@ -3,36 +3,36 @@
 <html lang="en">
 <head>
   {{template "head_meta" .}}
-  <title>Search · EcomHub</title>
+  <title>Search - EcomHub</title>
 </head>
 <body>
 {{template "header" .}}
 <main class="container">
   <h1>Search</h1>
   <form class="search-form" method="get" action="/search">
-    <input type="search" name="q" value="{{.Query}}" placeholder="Products or stores…" aria-label="Search">
+    <input type="search" name="q" value="{{.Query}}" placeholder="Products or stores..." aria-label="Search">
     <button type="submit">Search</button>
   </form>
   {{if .Query}}
   <h2>Products</h2>
-  <ul class="grid">
+  <ul class="hub-grid">
     {{range .Products}}
-    <li class="card">
-      <a href="/s/{{.Subdomain}}/products/{{.ID}}">{{.Name}}</a>
-      <p class="muted">{{.StoreName}} · ${{printf "%.2f" .Price}}</p>
+    <li class="hub-card">
+      <a class="hub-card-title" href="/s/{{.Subdomain}}/products/{{.ID}}">{{.Name}}</a>
+      <p class="hub-card-meta">{{.StoreName}} - ${{printf "%.2f" .Price}}</p>
     </li>
     {{else}}
-    <p class="muted">No matching products.</p>
+    <li class="hub-empty-state">No matching products.</li>
     {{end}}
   </ul>
   <h2>Stores</h2>
-  <ul class="grid">
+  <ul class="hub-grid">
     {{range .Stores}}
-    <li class="card">
-      <a href="/s/{{.Subdomain}}">{{.Name}}</a>
+    <li class="hub-card">
+      <a class="hub-card-title" href="/s/{{.Subdomain}}">{{.Name}}</a>
     </li>
     {{else}}
-    <p class="muted">No matching stores.</p>
+    <li class="hub-empty-state">No matching stores.</li>
     {{end}}
   </ul>
   {{end}}

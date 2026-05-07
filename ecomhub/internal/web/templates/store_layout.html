@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   {{template "head_meta" .}}
-  <title>{{.Store.Name}} · {{block "title" .}}{{end}}</title>
+  <title>{{.Store.Name}} - {{block "title" .}}{{end}}</title>
 </head>
 <body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --store-primary: {{.Theme.PrimaryColor}}; --store-accent: {{.Theme.AccentColor}}; --store-bg: {{.Theme.PageBg}}; --store-text: {{.Theme.TextColor}}; --store-card: {{.Theme.CardBg}}; --store-footer: {{.Theme.FooterBg}}; --rounding: {{.Theme.Rounding}}">
   {{template "store_header" .}}
@@ -42,5 +42,5 @@
 {{end}}
 
 {{define "store_footer"}}
-<footer class="site-footer store-footer">© {{.Store.Name}}</footer>
+<footer class="site-footer store-footer">(c) {{.Store.Name}}</footer>
 {{end}}

@@ -1398,14 +1398,66 @@ body.storefront .search-form button {
 .dashboard-body .stores-grid {
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+}
+
+.dashboard-body .store-card {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.dashboard-body .store-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dashboard-body .store-card-header .card-title {
+  margin-bottom: 0;
+}
+
+.dashboard-body .store-domain {
+  margin: 0;
+  color: var(--color-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95rem;
+}
+
+.dashboard-body .store-description {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.dashboard-body .store-description.is-muted {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.dashboard-body .store-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-success);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .dashboard-body .store-actions {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-top: var(--space-5);
+  margin-top: var(--space-2);
+}
+
+.dashboard-body .store-actions .btn {
+  flex: 1 1 120px;
 }
 
 .dashboard-body .error-msg {
@@ -1530,5 +1582,51 @@ body.storefront .search-form button {
 .hub-cta {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
   margin-top: 1.5rem;
+}
+
+.hub-grid {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-6) 0 0;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+}
+
+.hub-card,
+.hub-empty-state {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+.hub-card {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.hub-card-title {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.hub-card-title:hover {
+  color: var(--color-primary-hover);
+}
+
+.hub-card-meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.hub-empty-state {
+  color: var(--color-muted);
+  border-style: dashed;
+  box-shadow: none;
 }

@@ -3,20 +3,20 @@
 <html lang="en">
 <head>
   {{template "head_meta" .}}
-  <title>Stores · EcomHub</title>
+  <title>Stores - EcomHub</title>
 </head>
 <body>
 {{template "header" .}}
 <main class="container">
   <h1>Stores on EcomHub</h1>
-  <ul class="grid">
+  <ul class="hub-grid">
     {{range .Stores}}
-    <li class="card">
-      <a href="/s/{{.Subdomain}}">{{.Name}}</a>
-      <p class="muted">{{.Subdomain}}</p>
+    <li class="hub-card">
+      <a class="hub-card-title" href="/s/{{.Subdomain}}">{{.Name}}</a>
+      <p class="hub-card-meta">{{.Subdomain}}</p>
     </li>
     {{else}}
-    <p>No stores yet.</p>
+    <li class="hub-empty-state">No stores yet.</li>
     {{end}}
   </ul>
 </main>
