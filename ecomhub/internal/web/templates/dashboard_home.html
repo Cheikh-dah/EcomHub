@@ -45,6 +45,18 @@
                 <div class="card store-card">
                     <div class="store-card-header">
                         <h3 class="card-title">{{.Name}}</h3>
+                        <details class="store-menu">
+                            <summary class="store-menu-trigger" aria-label="Store actions">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </summary>
+                            <div class="store-menu-popover">
+                                <form method="post" action="/dashboard/stores/{{.ID}}/delete" onsubmit="return confirm('Delete this store? This removes the store and its products.');">
+                                    <button type="submit" class="store-menu-danger">Delete store</button>
+                                </form>
+                            </div>
+                        </details>
                     </div>
                     <p class="store-domain">{{.Subdomain}}.ecomhub.com</p>
                     {{if .Description}}

@@ -1402,6 +1402,7 @@ body.storefront .search-form button {
 }
 
 .dashboard-body .store-card {
+  position: relative;
   display: grid;
   gap: var(--space-3);
   align-content: start;
@@ -1447,6 +1448,75 @@ body.storefront .search-form button {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.dashboard-body .store-card-meta-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.dashboard-body .store-menu {
+  position: relative;
+}
+
+.dashboard-body .store-menu-trigger {
+  width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  gap: 3px;
+  padding: 3px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dashboard-body .store-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-body .store-menu-trigger span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-danger);
+}
+
+.dashboard-body .store-menu[open] .store-menu-trigger,
+.dashboard-body .store-menu-trigger:hover {
+  background: var(--color-surface-muted);
+}
+
+.dashboard-body .store-menu-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 5;
+  min-width: 160px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.dashboard-body .store-menu-danger {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-danger);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-body .store-menu-danger:hover {
+  background: #fef2f2;
 }
 
 .dashboard-body .store-actions {

@@ -74,6 +74,7 @@ func (s *Server) Mount(r *gin.Engine) {
 	dashAuth.Use(middleware.RequireAuthRedirect(s.pool, s.cfg.ClerkAuthorizedParties))
 	dashAuth.GET("/stores", s.dashboardStoresGet)
 	dashAuth.POST("/stores", s.dashboardCreateStore)
+	dashAuth.POST("/stores/:id/delete", s.dashboardStoreDelete)
 	dashAuth.GET("/stores/:id/theme", s.dashboardStoreThemeGet)
 	dashAuth.GET("/products", s.dashboardProductsGet)
 	dashAuth.POST("/products", s.dashboardProductsPost)
