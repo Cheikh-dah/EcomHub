@@ -1,21 +1,38 @@
 {{define "store_product_content"}}
-  <p class="crumb"><a href="/s/{{.Store.Subdomain}}">&larr; {{.Store.Name}}</a></p>
-  <h1>{{.Product.Name}}</h1>
-  <p class="price">
-    {{if .Product.Price}}${{printf "%.2f" .Product.Price}}{{else}}$0.00{{end}}
-  </p>
-  <p>{{.Product.Description}}</p>
-  {{if .Product.ImageURL}}
-  <div class="product-media product-media-detail">
-    <img class="product-media-img product-media-img--contain" src="{{.Product.ImageURL}}" alt="{{.Product.Name}}">
-  </div>
-  {{end}}
-  <p class="muted">Stock: {{.Product.Stock}}</p>
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <form method="post" action="/s/{{.Store.Subdomain}}/cart/add" class="inline-form">
-    <input type="hidden" name="product_id" value="{{.Product.ID}}">
-    <label>Qty <input type="number" name="quantity" value="1" min="1" max="{{.Product.Stock}}"></label>
-    <button type="submit" {{if le .Product.Stock 0}}disabled{{end}}>Add to cart</button>
-  </form>
-  <p><a href="/s/{{.Store.Subdomain}}/cart">View cart</a></p>
+  <section class="product-detail">
+    <p class="crumb"><a href="/s/{{.Store.Subdomain}}">&larr; {{.Store.Name}}</a></p>
+
+    <div class="product-detail-layout">
+      <div class="product-media product-media-detail">
+        {{if .Product.ImageURL}}
+          <img class="product-media-img product-media-img--contain" src="{{.Product.ImageURL}}" alt="{{.Product.Name}}">
+        {{else}}
+          <div class="product-media-placeholder">No image available</div>
+        {{end}}
+      </div>
+
+      <div class="product-detail-info">
+        <h1 class="product-detail-title">{{.Product.Name}}</h1>
+        <p class="product-detail-price">
+          {{if .Product.Price}}${{printf "%.2f" .Product.Price}}{{else}}$0.00{{end}}
+        </p>
+        {{if .Product.Description}}
+          <p class="product-detail-description">{{.Product.Description}}</p>
+        {{end}}
+        <p class="product-detail-stock muted">Stock: {{.Product.Stock}}</p>
+        {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+
+        <form method="post" action="/s/{{.Store.Subdomain}}/cart/add" class="product-purchase-form">
+          <input type="hidden" name="product_id" value="{{.Product.ID}}">
+          <label class="quantity-field">
+            <span>Qty</span>
+            <input class="quantity-input" type="number" name="quantity" value="1" min="1" max="{{.Product.Stock}}">
+          </label>
+          <button type="submit" class="btn btn-primary" {{if le .Product.Stock 0}}disabled{{end}}>Add to cart</button>
+        </form>
+
+        <p class="product-detail-link"><a href="/s/{{.Store.Subdomain}}/cart">View cart</a></p>
+      </div>
+    </div>
+  </section>
 {{end}}
