@@ -26,11 +26,11 @@
       <ul class="grid {{if eq .Theme.LayoutPreset "compact"}}compact{{end}}">
         {{range .Products}}
         <li class="card product-card">
-          <div class="product-image-wrapper">
+          <div class="product-media">
             {{if .ImageURL}}
-              <img src="{{.ImageURL}}" alt="{{.Name}}" />
+              <img class="product-media-img" src="{{.ImageURL}}" alt="{{.Name}}" />
             {{else}}
-              <div class="product-image-placeholder">No image available</div>
+              <div class="product-media-placeholder">No image available</div>
             {{end}}
           </div>
 

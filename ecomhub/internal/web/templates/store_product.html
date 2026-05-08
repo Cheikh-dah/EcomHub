@@ -1,12 +1,14 @@
 {{define "store_product_content"}}
-  <p class="crumb"><a href="/s/{{.Store.Subdomain}}">← {{.Store.Name}}</a></p>
+  <p class="crumb"><a href="/s/{{.Store.Subdomain}}">&larr; {{.Store.Name}}</a></p>
   <h1>{{.Product.Name}}</h1>
   <p class="price">
     {{if .Product.Price}}${{printf "%.2f" .Product.Price}}{{else}}$0.00{{end}}
   </p>
   <p>{{.Product.Description}}</p>
   {{if .Product.ImageURL}}
-  <p><img class="product-img" src="{{.Product.ImageURL}}" alt=""></p>
+  <div class="product-media product-media-detail">
+    <img class="product-media-img product-media-img--contain" src="{{.Product.ImageURL}}" alt="{{.Product.Name}}">
+  </div>
   {{end}}
   <p class="muted">Stock: {{.Product.Stock}}</p>
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
