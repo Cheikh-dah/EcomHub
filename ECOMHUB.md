@@ -1,183 +1,345 @@
-# EcomHub — project reference
+# EcomHub - project reference
 
-Single source of truth for MVP product, stack, routing, data model, roadmap, and checklist.
+Single source of truth for the current MVP direction, architecture, data model, roadmap, and guardrails.
 
 ---
 
 ## 1. Overview
 
-EcomHub helps sellers create a store quickly, share a public storefront link, and get light marketplace discovery. **MVP core loop:** create account → create store → add products → share storefront → receive basic orders.
+EcomHub is a multi-tenant commerce platform where merchants create online storefronts and customers discover stores/products through a shared ecosystem.
 
-**One-line summary:** Launch a simple online store and get discovered through a shared hub.
+Current MVP loop:
 
----
+```text
+Create account -> create store -> add products -> share storefront -> receive basic orders
+```
 
-## 2. MVP stack
+One-line summary:
 
-| Layer | Choice |
-|--------|--------|
-| Backend | Go + Gin (modular monolith) |
-| Database | PostgreSQL (`pgxpool`) |
-| Auth | Supabase Auth + internal `users` / `user_identities` mapping |
-| UI (MVP) | Server-rendered HTML from the Go app |
-| Local dev | Docker Compose (Postgres) + `go run ./cmd/server` from `ecomhub/` |
-| Deploy | Backend: Render / Fly / Railway; frontend later: Vercel |
-| Ops | `/health`, HTTPS, secure cookies |
+```text
+Launch a simple online store and get discovered through a shared hub.
+```
 
 ---
 
-## 3. Product
+## 2. Current Stack
 
-### Problem
+| Layer | Current choice |
+|-------|----------------|
+| Backend | Go + Gin modular monolith |
+| Database | PostgreSQL via pgxpool |
+| Auth | Clerk session JWTs + Go verification + internal users/user_identities mapping |
+| UI now | Server-rendered Go HTML templates + CSS |
+| Frontend later | Next.js on Vercel, starting with storefront pages |
+| Deploy now | Go app on Render/Fly/Railway-style service |
+| Ops | `/health`, HTTPS in production, secure HttpOnly auth cookie |
 
-Small sellers lack easy storefronts and built-in discovery; marketplaces vs DIY tools each solve only half.
+Architecture direction:
 
-### Goals (MVP)
+```text
+Now:
+Browser -> Go SSR/API -> PostgreSQL
 
-- Seller register / login (managed auth)
-- Create and manage stores
-- CRUD products
-- Public storefront + cart + basic order capture
-- Hub: list products/stores + simple search
+Later:
+Next.js/Vercel frontend -> Go API -> PostgreSQL
+```
 
-### Non-goals (MVP)
-
-- Payment gateway, advanced ranking, native app, microservices
-
-### Users
-
-- **Sellers:** small businesses, students, social sellers  
-- **Buyers:** browsers of public stores and hub search
-
-### Scope by area
-
-**Auth:** Supabase Auth (sessions, email verification); backend resolves provider identity → internal `userID`; owner routes protected.
-
-**Stores:** name, description, unique **subdomain** (public URL); reserved names blocked at create/update.
-
-**Products:** name, description, price, stock, image_url.
-
-**Public storefront:** see §4 Storefront routing.
-
-**Discovery:** public products/stores lists + basic search.
-
-### User flows
-
-- **Seller:** login (apex) → dashboard → create store → add products → share `https://{subdomain}.ecomhub.com` → review orders  
-- **Buyer:** discover → open storefront → browse → cart → submit order
-
-### Success metrics
-
-Registered sellers, stores, products, orders, discovery traffic.
-
-### Risks (short)
-
-Cold start (seed content), spam (validation + moderation backlog), scope creep (enforce non-goals), reliability (health, logs, backups).
-
-### Post-MVP
-
-Payments, reviews, better search, seller analytics, image CDN/storage.
+The current Go SSR frontend should remain working while the backend becomes API-ready for a gradual Next.js migration.
 
 ---
 
-## 4. Storefront routing (MVP)
+## 3. Product Scope
 
-**Decision:** Option 1 — **dual routing, host-first** (storefront only on subdomains; dashboard + hub on apex).
+### MVP Goals
 
-| Environment | Buyer URL | Seller / hub |
-|---------------|-----------|----------------|
-| Production | `https://{subdomain}.ecomhub.com` | `https://ecomhub.com` |
-| Dev | `http://{subdomain}.localhost:{port}` with `BASE_HOST=localhost` | same host apex paths |
+- Merchant login with Clerk.
+- Create/manage stores.
+- Add/delete products.
+- Public storefront pages.
+- Product detail pages.
+- Hub pages for products/stores/search.
+- Basic cart/order flow.
+- Lightweight theme customization: colors, logo URL, layout preset, rounding.
 
-**Fallback:** `/s/{subdomain}` (and nested paths) when `BASE_HOST` is empty or for tests.
+### Current Commerce Positioning
 
-**Rules**
+EcomHub is moving toward a lightweight merchant storefront model. For the near-term MVP, avoid building a heavy checkout/media/editor system too early.
 
-- Parse `Host` without port; lowercase; **single-level** label only (reject extra dots in the tenant label).
-- Strict match against `BASE_HOST` (e.g. `ecomhub.com`); avoid naive suffix bugs on lookalike domains.
-- **Reserved** (never tenant): `www`, `api`, `admin`, `app`, `dashboard`, `mail`, `support` (extend as needed).
-- **Store `status`:** only `active` serves public storefront; unknown or non-active → branded **Store not found** (optional subdomain in copy + CTAs: browse stores, create store).
-- **Cache:** subdomain → store in-memory + TTL; invalidate on store writes; Redis later.
-- **Logs:** host → subdomain → store id or not-found for debugging.
+Recommended near-term ordering flow:
 
-**Infra:** DNS wildcard `*.ecomhub.com` → app; TLS for apex + wildcard.
+```text
+Customer visits store
+-> sees products
+-> opens product
+-> orders through the merchant workflow
+```
 
----
+Do not add advanced payment, crop tools, upload pipelines, or media libraries until the core storefront/dashboard flows are stable.
 
-## 5. Data model (MVP)
+### Non-goals For Current MVP
 
-**users:** id, email, `password_hash` (nullable for Supabase-only accounts), created_at  
-
-**user_identities:** id, user_id, provider (`supabase`), provider_subject (Supabase JWT `sub`), provider_email, created_at; unique `(provider, provider_subject)`  
-
-**stores:** id, user_id, name, subdomain (unique), description, **status** (`active` \| `suspended` \| `deleted`), created_at  
-
-**products:** id, store_id, name, description, price, stock, image_url, created_at  
-
-**orders / order_items:** as implemented for MVP checkout.
-
----
-
-## 6. API surface (target)
-
-**Auth:** Supabase access token verified with `SUPABASE_JWT_SECRET`; middleware maps `sub` → `user_identities` → internal `userID`. Dashboard: Supabase JS sign-in → `POST /dashboard/session` (sets HttpOnly `auth_token`, optional `next` redirect). `GET /api/me`, `POST /api/logout`.
-
-**Stores:** `GET/POST /api/stores`, `PUT /api/stores/:id`  
-
-**Products:** `GET/POST /api/products`, `PUT/DELETE /api/products/:id`  
-
-**Cart / orders:** `GET /api/cart`, `POST /api/cart/add|remove|clear`, `POST /api/orders`, `GET /api/orders`
-
-**Hub HTML:** `/products`, `/stores`, `/search?q=...`
+- Full payment gateway.
+- Advanced analytics.
+- Native app.
+- Microservices.
+- Drag-and-drop storefront builder.
+- Image crop/focal-point editor.
+- Upload/CDN/image transformation pipeline.
+- Full Next.js rewrite in one pass.
 
 ---
 
-## 7. Environment variables
+## 4. Routing
+
+### Current
+
+The current storefront route is path-based:
+
+```text
+/s/{subdomain}
+/s/{subdomain}/products/{id}
+/s/{subdomain}/cart
+```
+
+Hub/dashboard routes live on the same Go app:
+
+```text
+/
+/products
+/stores
+/search
+/dashboard
+```
+
+### Future
+
+Subdomain storefronts are a strong reason to introduce Next.js on Vercel later:
+
+```text
+{store}.ecomhub.com -> Next.js storefront route
+ecomhub.com         -> hub/dashboard routes
+api.ecomhub.com     -> Go API, or same backend origin behind rewrites
+```
+
+Migration should be gradual:
+
+1. Keep Go SSR working.
+2. Add/standardize JSON APIs for public storefront data.
+3. Build Next.js storefront first.
+4. Move dashboard/theme editor later.
+5. Retire Go templates only when replacement routes are stable.
+
+---
+
+## 5. Data Model
+
+Key tables:
+
+- `users`: internal user profile.
+- `user_identities`: maps Clerk user subject to internal `users.id`.
+- `stores`: merchant-owned stores with `name`, `subdomain`, `description`, `status`, `theme_config`.
+- `products`: store-owned products with `image_url`.
+- `orders` / `order_items`: current basic order tables.
+
+Important relationships:
+
+- `products.store_id` references `stores(id)` with `ON DELETE CASCADE`.
+- `orders.store_id` references `stores(id)` with `ON DELETE RESTRICT`.
+- Store deletion must always be owner-scoped:
+
+```sql
+DELETE FROM stores
+WHERE id = $1 AND user_id = $2
+```
+
+---
+
+## 6. API Surface
+
+Current protected API examples:
+
+```text
+GET    /api/me
+POST   /api/logout
+GET    /api/stores
+POST   /api/stores
+PUT    /api/stores/:id
+GET    /api/stores/:id/theme
+PUT    /api/stores/:id/theme
+GET    /api/products?store_id=<id>
+POST   /api/products
+PUT    /api/products/:id
+DELETE /api/products/:id
+GET    /api/cart
+POST   /api/cart/add
+POST   /api/cart/remove
+POST   /api/cart/clear
+POST   /api/orders
+GET    /api/orders
+```
+
+Future public API readiness for Next.js storefront:
+
+```text
+GET /api/public/stores/:subdomain
+GET /api/public/stores/:subdomain/products
+GET /api/public/stores/:subdomain/products/:id
+GET /api/public/stores/:subdomain/theme
+```
+
+Those endpoints should return stable JSON shapes that a future Next.js storefront can consume without depending on Go templates.
+
+---
+
+## 7. Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Postgres connection |
-| `SUPABASE_URL` | Supabase project URL (`https` required when `ENVIRONMENT` is `staging` or `production`) |
-| `SUPABASE_JWT_SECRET` | JWT signing secret from Supabase Dashboard → Settings → API (verifies user access tokens; **not** the service_role key) |
-| `SUPABASE_ANON_KEY` | **Required** — public anon key for the dashboard Supabase client |
-| `SUPABASE_SERVICE_KEY` | Optional — server-only when a feature needs it |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `CLERK_SECRET_KEY` | Clerk backend secret key |
+| `CLERK_PUBLISHABLE_KEY` | Clerk browser publishable key |
+| `CLERK_FRONTEND_API` | Optional Clerk frontend origin override |
+| `CLERK_AUTHORIZED_PARTIES` | Optional exact origins for Clerk JWT `azp` validation |
+| `APP_URL` | Public app origin; used for auth origin defaults |
 | `PORT` | HTTP port |
 | `ENVIRONMENT` | `development`, `staging`, or `production` |
-| `APP_URL` | Optional public app base URL (`https` required in production when set) |
-| `BASE_HOST` | Optional — production: `ecomhub.com`; dev: `localhost`; empty → path-only `/s/{subdomain}` |
 
 ---
 
-## 8. Roadmap (phased)
+## 8. UI Architecture Decisions
 
-**Phase 0 — Setup:** Deployable backend; Supabase Auth + `users` / `user_identities`; env vars set; Postgres + app running; dashboard + store pages reachable.
+### Component-minded SSR
 
-**Phase 1 — Core backend:** Schema as §5; APIs as §6; auth middleware; storefront routing §4; seller can register, store, products, test order.
+The current frontend is Go SSR, but class naming should stay component-minded so it can migrate cleanly to Next.js later.
 
-**Phase 2 — UI:** Auth screens (Supabase); dashboard (store CRUD, products, orders); public storefront on subdomain + fallback paths.
+Current semantic contracts:
 
-**Phase 3 — Hub:** Global discovery routes live.
+```text
+.product-media              -> future <ProductImage />
+.product-media-img          -> internal image element
+.product-media-img--contain -> fit="contain"
+.product-card               -> future <ProductCard />
+.hub-card                   -> future <HubCard />
+.store-card                 -> future <StoreCard />
+.site-nav                   -> future navigation primitive
+.store-logo                 -> future <StoreLogo />
+```
 
-**Phase 4 — Launch:** DNS/TLS, CORS/cookies, logging, `/health`, DB backups; public beta.
+### Product Media Policy
+
+Do now:
+
+- Product cards use `cover`.
+- Product detail uses `contain`.
+- Wrapper controls aspect ratio/layout.
+- Image controls rendering fit.
+- Merchant-owned media stays as remote URLs.
+
+Do later:
+
+- Upload-to-storage.
+- CDN/image optimization.
+- Crop/focal-point tooling.
+
+### Store Logo Policy
+
+Do now:
+
+- Store logo is `logo_url` in `theme_config`.
+- Theme Editor accepts a remote HTTP(S) logo URL.
+- Storefront header renders `.store-logo` when present.
+- Fallback to store name when missing.
+
+Do not do now:
+
+- Upload UI.
+- Crop editor.
+- Media library.
+- Banner system.
+
+### Mobile Navigation Policy
+
+Current simple stacked navigation is enough for MVP.
+
+A hamburger/drawer should be a later reusable interface system, not a one-off toggle. Build it when navigation grows enough to justify:
+
+- overlay state
+- focus management
+- body scroll locking
+- Escape key behavior
+- z-index coordination
+- accessibility labels/states
 
 ---
 
-## 9. MVP acceptance checklist
+## 9. Security Notes
 
-- [ ] Register / login with managed auth  
-- [ ] Create at least one store  
-- [ ] Add / edit / delete products  
-- [ ] Open storefront via `{store}.ecomhub.com` or `/s/{store}` and view products  
-- [ ] Unknown or inactive subdomain → branded Store not found  
-- [ ] Cart + basic checkout  
-- [ ] Hub pages `/products`, `/stores`, `/search` functional  
+Current:
+
+- Clerk session JWTs are verified by Go.
+- Backend middleware is the security authority.
+- Dashboard HTML routes use auth middleware.
+- Store/product writes perform owner checks.
+- Store delete uses POST and owner-scoped SQL.
+- Auth cookie uses `SameSite=Lax`.
+
+Known follow-up:
+
+- Add CSRF tokens for destructive dashboard forms before serious production usage.
 
 ---
 
-## 10. Current status (repo)
+## 10. Roadmap
 
-- **Auth:** Supabase JWT in middleware; JIT `users` + `user_identities`; dashboard sign-in + `POST /dashboard/session`; HttpOnly `auth_token` max-age from JWT `exp`; safe `next` redirect after checkout login.  
-- **Schema:** `user_identities`, `stores.status`, nullable `users.password_hash`; migrations `001_init.sql` + `002_user_identities_store_status.sql` (re-applied on boot — keep SQL idempotent).  
-- **API / UI:** Store + product CRUD with owner checks; atomic product `PUT`; batched product reads for cart resolve / HTML cart / `placeOrder` lock; hub + `/s/{subdomain}` storefront; public listings use **active** stores only.  
-- **Next (product / routing):** reserved subdomain enforcement, host-first routing (`BASE_HOST`), branded inactive-store pages.  
-- **Next (scale / ops, when needed):** `pg_trgm` or dedicated search if hub `ILIKE` slows down; `schema_migrations` ledger if boot migrations stop being idempotent; optional signed/HMAC cart cookie for defense in depth (checkout already re-validates).
+### Phase 1 - Stabilize Current MVP
+
+- Keep Go SSR working.
+- Polish storefront/product/dashboard UX.
+- Harden auth/session and destructive actions.
+- Keep media and navigation semantics migration-ready.
+
+### Phase 2 - API Readiness
+
+- Audit current JSON endpoints.
+- Add missing public storefront JSON endpoints.
+- Standardize response shapes.
+- Document auth requirements and error behavior.
+
+### Phase 3 - Next.js Storefront
+
+- Deploy Next.js on Vercel.
+- Use subdomain routing for stores.
+- Consume Go public APIs.
+- Keep Go as backend authority.
+
+### Phase 4 - Dashboard Migration
+
+- Move merchant dashboard/theme editor only after storefront is stable.
+- Preserve Go API and ownership checks.
+
+### Phase 5 - Retire Go SSR Views
+
+- Remove old templates only after Next.js replacements are live and verified.
+
+---
+
+## 11. Current Status Snapshot
+
+- Clerk auth bridge is active.
+- Dashboard/store/product SSR flows exist.
+- Hub pages exist.
+- Path-based storefront exists.
+- Theme config includes colors, logo URL, layout preset, rounding, and surface colors.
+- Product media semantics are in place.
+- Storefront logo URL rendering is polished.
+- Mobile nav foundation uses semantic `.site-nav` classes, without drawer infrastructure.
+
+---
+
+## 12. Principle
+
+```text
+Stabilize the product core first.
+Define clean semantic boundaries now.
+Move to Next.js gradually when the API boundary is ready.
+```

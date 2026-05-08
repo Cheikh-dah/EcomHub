@@ -1,224 +1,186 @@
-# EcomHub — Auth bridge (Clerk + Go + browser)
+# EcomHub Auth Bridge
 
-This document is the **single reference** for how authentication works today: identity (Clerk), the **session bridge** (browser ↔ server), and **backend authority** (JWT verification + Postgres).
+This document explains the current Clerk + Go authentication model.
 
-For product and scaling context, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHEATSHEETS.md).
-For endpoint-by-endpoint request/response examples, see [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
+For API payloads, see [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
+For product architecture, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHEATSHEETS.md).
 
----
-
-## Documentation Scope
-
-- This file is the **source of truth** for Clerk/session bridge behavior and auth verification internals.
-- If token verification logic, cookie/session bridging, or auth middleware behavior changes, update this file in the same PR.
-- Keep endpoint payload contracts in `REST-API-REFERENCE.md`.
-
----
-
-## 1) Three layers
+## Mental Model
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Identity (Clerk)                                         │
-│    Browser: Clerk JS + session JWT from Clerk              │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ POST /dashboard/session
-                            │ JSON: session_token (or access_token)
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Session bridge                                            │
-│    Server sets HttpOnly cookie `auth_token` = Clerk JWT    │
-│    Max-Age derived from JWT `exp`                            │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ Cookie or Authorization: Bearer
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Backend authority                                         │
-│    Verify JWT (Clerk JWKS) → `sub` (Clerk user id)         │
-│    Resolve → `user_identities` (`provider=clerk`) →       │
-│    internal `users.id` → APIs + HTML enforce ownership      │
-└─────────────────────────────────────────────────────────────┘
+1. Clerk identifies the browser user.
+2. Browser gets a Clerk session JWT.
+3. Browser POSTs that JWT to /dashboard/session.
+4. Go verifies the JWT with Clerk.
+5. Go maps Clerk sub -> internal users.id through user_identities.
+6. Go sets an HttpOnly auth_token cookie.
+7. Dashboard/API requests use the cookie or a Bearer token.
 ```
 
-**Rules of thumb**
+Clerk decides who signed in. Go decides whether a request is authorized and which internal user owns the requested data.
 
-- **Clerk** decides *who signed in* in the browser.
-- **Go** decides *whether this request is authenticated* and *which internal `user_id`* it maps to.
-- **Postgres** is the source of truth for stores, products, and `(provider, provider_subject)` identity links.
+## Environment Variables
 
----
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `CLERK_SECRET_KEY` | Yes | Backend secret key used by Go for Clerk API/JWKS work |
+| `CLERK_PUBLISHABLE_KEY` | Yes | Browser publishable key used by Clerk JS |
+| `CLERK_FRONTEND_API` | No | Explicit Clerk frontend origin override |
+| `CLERK_AUTHORIZED_PARTIES` | No | Exact browser origins allowed in JWT `azp` |
+| `APP_URL` | Recommended | Public app origin; can seed authorized parties |
+| `ENVIRONMENT` | Yes | `development`, `staging`, or `production` |
 
-## 2) Environment variables
+Never commit real `.env` values.
 
-| Variable | Required | Role |
-|----------|----------|------|
-| `CLERK_SECRET_KEY` | Yes | `sk_test_…` / `sk_live_…`. Set via `clerk.SetKey` in `cmd/server/main.go` for Backend API (JWKS fetch, `user.Get` on JIT). |
-| `CLERK_PUBLISHABLE_KEY` | Yes | `pk_test_…` / `pk_live_…`. Embedded in dashboard bootstrap JSON for Clerk JS only. |
-| `CLERK_FRONTEND_API` | No | Full origin from Clerk **API keys** (Frontend API), e.g. `https://YOUR_INSTANCE.clerk.accounts.dev`. If unset, the dashboard derives the origin from the publishable key (Clerk’s documented pattern). |
-| `CLERK_AUTHORIZED_PARTIES` | No | Comma-separated **exact** origins allowed in the JWT `azp` claim. If unset and `APP_URL` is set, `APP_URL` (trimmed, no trailing slash) is added as a single allowed party. |
-| `APP_URL` | Recommended | Public base URL of this app (e.g. `http://localhost:8080`). Used for `azp` when parties list is empty. |
-| `ENVIRONMENT` | Yes | `development` \| `staging` \| `production`. Cookie `Secure` is on when `production`. |
+## Server Components
 
-Copy from [.env.example](../.env.example). Never commit real `.env`.
+| Component | Location | Responsibility |
+| --- | --- | --- |
+| Clerk setup | `cmd/server/main.go` | Calls `clerk.SetKey` |
+| JWT verification | `internal/auth/clerk_session.go` | Verifies Clerk session JWTs |
+| Identity resolution | `internal/auth/identity.go` | Maps Clerk users to internal users |
+| Auth middleware | `internal/middleware/auth.go` | Reads cookie/Bearer token and sets `userID` |
+| Session bridge | `internal/httpserver/handlers_html.go` | Handles `POST /dashboard/session` |
+| Logout | HTML/API handlers | Clears `auth_token` |
 
----
+## HTTP Contract
 
-## 3) Server components
+### `POST /dashboard/session`
 
-| Piece | Location | Behavior |
-|-------|----------|----------|
-| Clerk API key | `cmd/server/main.go` | `clerk.SetKey(cfg.ClerkSecretKey)` before serving traffic. |
-| JWT verification | `internal/auth/clerk_session.go` | `jwt.Verify` (RS256 via JWKS). Optional `AuthorizedPartyHandler` when `ClerkAuthorizedParties` is non-empty. |
-| User resolution | `internal/auth/identity.go` | `ResolveClerkUser`: lookup `user_identities` for `provider=clerk` + `provider_subject=sub`; on miss, `user.Get` then JIT `users` + identity row. |
-| Auth middleware | `internal/middleware/auth.go` | `RequireAuth` / `OptionalAuth`: read `Authorization: Bearer` or `auth_token` cookie, verify + resolve, set `userID` on Gin context. |
-| Session endpoint | `internal/httpserver/handlers_html.go` | `POST /dashboard/session`: verify token, resolve user, `setAuthCookie`, JSON `{ ok, redirect }`. |
-| Logout | `POST /dashboard/logout` + `POST /api/logout` | Clear `auth_token`. HTML logout redirects to `/dashboard?signed_out=1` so the dashboard can run `Clerk.signOut()` and avoid an instant Clerk→server re-sync loop. |
+Auth: none.
 
----
+Body:
 
-## 4) HTTP contract (auth-related)
+```json
+{
+  "session_token": "<clerk-session-jwt>",
+  "next": "/dashboard"
+}
+```
 
-| Method | Path | Auth | Body / notes |
-|--------|------|------|----------------|
-| `POST` | `/dashboard/session` | No | JSON: `session_token` **or** `access_token` (Clerk session JWT), optional `next` (internal path only; server validates). Response: `{ "ok": true, "redirect": "/dashboard" }`. |
-| `POST` | `/dashboard/logout` | No | Clears cookie; redirect `See Other` to `/dashboard?signed_out=1`. |
-| `POST` | `/api/logout` | No | Clears cookie; JSON `{ "ok": true }`. |
-| `GET` | `/api/me` | Yes | Cookie or `Authorization: Bearer` with same Clerk JWT. Response: `{ "user_id": "<uuid>" }`. |
+`access_token` is also accepted for compatibility.
 
-Protected API routes live under `/api/…` with `RequireAuth`. Dashboard POST `/dashboard/stores` uses the same cookie.
+Behavior:
 
----
+- Verifies the Clerk JWT.
+- Resolves/creates the internal user identity.
+- Sets `auth_token` as an HttpOnly cookie.
+- Returns a safe internal redirect path.
 
-## 5) Dashboard frontend (`internal/web/templates/dashboard.html`)
+Response:
 
-**Config delivery**
+```json
+{
+  "ok": true,
+  "redirect": "/dashboard"
+}
+```
 
-- Server renders `<script type="application/json" id="ecomhub-clerk-bootstrap">` with `ClerkBootstrapJSON` (`publishableKey`, `frontendAPI`).
-- The module script `JSON.parse`s that blob with validation so templating never injects raw strings into executable JS.
+### `GET /api/me`
 
-**Lifecycle (order matters)**
+Auth: required.
 
-1. Parse and validate bootstrap (publishable key non-empty).
-2. Resolve Frontend API URL (override or derive).
-3. Load `@clerk/ui` then `@clerk/clerk-js` from that origin.
-4. `await Clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } })`.
-5. Only then read `Clerk.isSignedIn`, `Clerk.session`, mount SignIn, or sync the server session.
+Accepts either `auth_token` cookie or `Authorization: Bearer <clerk_session_jwt>`.
 
-**Session sync (idempotent bridge)**
+```json
+{
+  "user_id": "<uuid>"
+}
+```
 
-- `syncServerSessionIfNewToken(token)` dedupes with `lastSyncedToken`, serializes with `syncing`, and clears `lastSyncedToken` on failed `POST /dashboard/session` so Clerk listeners can retry.
-- `establishSession` uses an `establishing` guard to avoid overlapping fetches for the same logical operation.
+### `POST /dashboard/logout`
 
-**Logout UX**
+Clears `auth_token` and redirects to `/dashboard?signed_out=1`.
 
-- After server clears the cookie, `?signed_out=1` triggers `Clerk.signOut()` before mounting SignIn so a lingering Clerk session does not immediately re-POST `/dashboard/session`.
+### `POST /api/logout`
 
-**Background Session Sync (`clerk_sync` partial)**
+Clears `auth_token`.
 
-To prevent session timeout while a merchant is active on dashboard sub-pages (like the Theme Editor), a shared `clerk_sync` partial is used:
-- **Location**: `internal/web/templates/layout.html` (`{{define "clerk_sync"}}`)
-- **Behavior**:
-  1. Loads Clerk JS if not already present.
-  2. Handshakes with Clerk to confirm the session.
-  3. Sets up a `Clerk.addListener` (or `setInterval` fallback) to watch for token updates.
-  4. Periodically POSTs the latest session JWT to `/dashboard/session` to keep the server's `auth_token` cookie fresh.
-  5. Automatically mounts the Sign-In UI if a `#clerk-signin-root` element is present (idempotent).
-- **Usage**: Included at the bottom of `dashboard.html` and `theme_editor.html` via `{{template "clerk_sync" .}}`.
+```json
+{ "ok": true }
+```
 
----
+## Cookie Policy
 
-## 6) Database
+`auth_token` should be:
 
-- **`users`**: internal profile; `password_hash` may be null for Clerk-only users.
-- **`user_identities`**: `provider = 'clerk'`, `provider_subject` = Clerk user id (JWT `sub`, e.g. `user_…`). Unique `(provider, provider_subject)`.
-- Legacy rows with other `provider` values are not used by the current code path.
+- HttpOnly.
+- SameSite=Lax.
+- Secure in production.
+- Max age derived from the Clerk JWT expiry.
 
----
+CSRF protection is not complete yet. SameSite=Lax helps, but destructive dashboard forms should get CSRF tokens before serious production use.
 
-## 7) Clerk Dashboard checklist
+## Dashboard Frontend Lifecycle
 
-- **Allowed origins / redirect URLs** must include your app origin (e.g. `http://localhost:8080`) so session tokens and `azp` align with `CLERK_AUTHORIZED_PARTIES` / `APP_URL`.
-- Use **separate** Clerk instances or keys for production vs development when you go live.
+The dashboard must:
 
----
+1. Load Clerk JS using the server-provided publishable key.
+2. Wait for `Clerk.load`.
+3. Check `Clerk.isSignedIn` and `Clerk.session`.
+4. Call `Clerk.session.getToken()`.
+5. POST the token to `/dashboard/session`.
+6. Continue to the intended dashboard page.
 
-## 8) Production checklist
+Do not send `document.cookie` as the session token. Clerk cookies are not the same as the Clerk session JWT returned by `Clerk.session.getToken()`.
 
-- [ ] `ENVIRONMENT=production`, `APP_URL` and Clerk URLs use **https**.
-- [ ] `CLERK_AUTHORIZED_PARTIES` explicitly lists every browser origin that may obtain a session JWT (do not rely on defaults alone in prod).
-- [ ] Postgres is **not** exposed on the public internet; only the app tier can connect.
-- [ ] Secrets only in env / secret manager, not in git.
-- [ ] Plan **backups** and a tested restore for Postgres.
+## Background Session Sync
 
----
+Dashboard pages can include the `clerk_sync` partial to keep the Go cookie aligned with Clerk while the merchant works.
 
-## 9) Troubleshooting
+This is useful for pages like the theme editor, where the merchant may stay active for a while without leaving the page.
 
-| Symptom | Things to check |
-|---------|------------------|
-| `401` on `/api/me` or APIs | Cookie missing or expired; `Authorization: Bearer` wrong token; Clerk JWT secret path OK (JWKS + `SetKey`). |
-| `invalid token` on `/dashboard/session` | Clock skew; wrong Clerk instance keys; `azp` rejected — set `CLERK_AUTHORIZED_PARTIES` / `APP_URL` to match the browser origin Clerk uses. |
-| Dashboard blank / “Invalid auth configuration” | `CLERK_PUBLISHABLE_KEY` empty in env; server not restarted; malformed JSON in bootstrap (should not happen if config loads). |
-| `.env` has keys but Go sees them **empty** (Windows) | A **User or System** environment variable with the same name (sometimes set to nothing) takes precedence over `.env` with default `godotenv.Load`. This project uses **`godotenv.Overload()`** in `config.Load()` so **`.env` wins** after all. If you still see issues, remove stray `CLERK_*` / `DATABASE_URL` entries from Windows “Environment variables”. |
-| PowerShell `KEY=value` fails | That is **bash** syntax. Set vars in **`.env`** or use `$env:KEY = "value"` for the current session only. |
-| Clerk scripts fail to load | Set `CLERK_FRONTEND_API` explicitly; check ad blockers; confirm Frontend API URL in Clerk **API keys** page. |
-| “Could not resolve user” | Clerk `user.Get` failed (network, key, or user deleted in Clerk). |
+## Database
 
----
+`user_identities` is the bridge between Clerk and EcomHub:
 
-## 10) Optional future work (not implemented)
+```text
+provider = "clerk"
+provider_subject = Clerk JWT sub
+user_id = internal users.id
+```
 
-| Item | Purpose |
-|------|---------|
-| **Auth bridge spec versioning** | If mobile or third-party clients also sync sessions, document their `POST` contract alongside the dashboard. |
-| **Clerk Organizations → RBAC** | Map org roles / permissions from JWT claims to route-level authorization in Go. |
-| **Refresh / rotation** | Today the browser relies on Clerk’s session lifecycle; explicit refresh policies can be added if session length becomes a product requirement. |
+Authorization must use internal ownership fields after identity resolution.
 
----
+Example:
 
-## 10.1) Dashboard scope guidance
+```sql
+SELECT * FROM stores WHERE id = $1 AND user_id = $2;
+```
 
-Given the current codebase shape (Go SSR templates + backend route guards), treat these as separate workstreams:
+## Troubleshooting
 
-- **Now:** strengthen current dashboard SSR flows and auth/session reliability.
-- **Later:** introduce a separate client-side dashboard route architecture *only if needed*.
+| Symptom | Likely cause |
+| --- | --- |
+| `window.Clerk` is undefined | Clerk JS did not load or bootstrap data is missing |
+| `session_token required` | Request body was empty or token variable was undefined |
+| `invalid token` | Sent Clerk cookie text instead of `Clerk.session.getToken()` result, wrong Clerk instance, or `azp` mismatch |
+| `/api/me` returns 401 | Missing/expired cookie or Bearer token |
+| User can sign in but dashboard loops | Server cookie not being created or cleared/synced correctly |
 
-This avoids mixing three high-risk changes at once:
+## Future Next.js Direction
 
-1. identity/session migration,
-2. frontend architecture migration,
-3. API envelope redesign.
+When a Next.js frontend is introduced, Go should remain the authorization authority.
 
-Keep backend middleware as security authority in both models.
+Good migration options:
 
----
+- Next.js gets a Clerk session token and calls Go APIs with `Authorization: Bearer`.
+- Or Next.js routes complete the same session bridge and rely on the Go cookie.
 
-## 11) Host-based subdomains (SaaS routing)
+Do not combine all of these in one step:
 
-Current storefront URLs support `/s/{subdomain}`. To match production SaaS routing (`store.example.com`) add host-first resolution and keep path fallback during rollout.
+- frontend rewrite,
+- auth rewrite,
+- API contract redesign.
 
-### Local development
+Move one boundary at a time.
 
-- Keep `BASE_HOST=localhost`.
-- Use `store1.localhost:8080`, `store2.localhost:8080` where supported by your browser/OS.
-- Keep `/s/{subdomain}` as fallback if local host resolution is unavailable.
+## Production Checklist
 
-### Render (single service) baseline
-
-- One Render web service can host many tenant subdomains.
-- Configure DNS for apex plus wildcard (`*.yourdomain.com`) to the same service.
-- Set `BASE_HOST=yourdomain.com` in Render environment variables.
-- Ensure TLS/certificate coverage for wildcard and apex based on Render's current domain features.
-
-### Middleware contract (target)
-
-1. Read `Host` (strip port).
-2. If host matches `{subdomain}.{BASE_HOST}`, resolve store by `subdomain` and `status='active'`.
-3. Attach resolved store/tenant id to request context.
-4. If not resolvable, continue existing hub/dashboard routes and `/s/{subdomain}` fallback.
-
-This gives local and production the same tenant-identification model while preserving backward compatibility.
-
----
-
-*Last aligned with:* Clerk session JWT verification in Go, dashboard bootstrap JSON pattern, and `user_identities.provider = clerk`.
+- Use HTTPS.
+- Set `ENVIRONMENT=production`.
+- Set exact `CLERK_AUTHORIZED_PARTIES`.
+- Keep database credentials private.
+- Avoid logging JWTs.
+- Add CSRF tokens for destructive POST actions.
+- Use separate Clerk keys for development and production.

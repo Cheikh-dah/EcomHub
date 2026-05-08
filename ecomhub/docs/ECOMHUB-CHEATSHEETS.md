@@ -1,316 +1,210 @@
-# EcomHub — build cheatsheets
+# EcomHub Cheatsheets
 
-Quick reference: evolve a **working monolith** into a **multi-tenant hub** without premature complexity.
+Quick reference for the current MVP and the path toward a future separated frontend.
 
-**Auth (Clerk + Go + cookie bridge):** see [AUTH-BRIDGE.md](./AUTH-BRIDGE.md) for env vars, endpoints, dashboard JS lifecycle, and production checks.
-**REST API endpoints and payloads:** see [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
-
----
-
-## Documentation Scope
-
-- This file is the **source of truth** for MVP scope, architecture stages, and implementation priorities.
-- Keep this doc high-level; avoid duplicating endpoint payload details from `REST-API-REFERENCE.md`.
-- If roadmap/phase guidance changes, update this file in the same PR.
-
----
-
-## 1) Evolution at a glance
-
-| Phase | You add | Stack shape |
-|-------|---------|-------------|
-| **1** MVP | Auth, stores, products, simple storefront, orders | `User → Go monolith → PostgreSQL` |
-| **2** Multi-tenant | `store_id` everywhere, resolve store from host/path, scoped queries | Same + **strict isolation** |
-| **3** Hub | Global `/products`, `/stores`, `/search` | Tenant DB + **aggregated / indexed global view** |
-| **4** Scale | Indexes, Redis, CDN | `… → PG (+ replicas later) + Redis + CDN` |
-| **5–8** Later | Split services (if needed), analytics DB, search engine, horizontal scale | `CDN → LB → stateless services → DBs + cache + search + events` |
-
-**Golden path:** validate → isolate tenants → add hub read models → measure → cache/CDN → search/events → split only when justified.
-
----
-
-## 2) Stage cheatsheet
-
-### Stage 1 — Monolith MVP (single server)
-
-| Item | Choice |
-|------|--------|
-| **Goal** | Ship fast; learn domain |
-| **Backend** | One Go service |
-| **DB** | PostgreSQL |
-| **Frontend** | Basic (SSR or SPA) |
-| **Features** | Auth, store creation, product CRUD, storefront (subdomain or path), simple orders |
-| **Host** | Single VPS / Render / Fly / similar |
-| **Why** | Idea validation; avoid premature architecture |
-
-### Stage 2 — Multi-tenant design
-
-| Item | Rule |
-|------|------|
-| **Goal** | Many users, one platform, safe isolation |
-| **Schema** | `store_id` on all tenant-owned rows |
-| **Queries** | Always `WHERE store_id = ?` (plus authz) |
-| **Middleware** | `Request → resolve store → attach context` |
-| **Resolve store** | Subdomain `store1.app.com` **or** path `/store/store1` |
-| **Mental model** | **Isolation first** — no cross-store leaks in tenant APIs |
+## Current Stack
 
 ```text
-resolveStore(host or path) → store_id
-SELECT … FROM products WHERE store_id = ? AND …
+Browser -> Go SSR/API -> PostgreSQL
+                 |
+                 +-> Clerk identity/session JWTs
 ```
 
-### Stage 3 — Hub (global layer)
+| Area | Current choice |
+| --- | --- |
+| Backend | Go + Gin |
+| Frontend | Go SSR templates + scoped CSS |
+| Database | PostgreSQL |
+| Auth | Clerk session JWTs verified by Go |
+| Deployment | Render is the current simplest path |
+| Future frontend | Next.js on Vercel after API boundaries are ready |
 
-| Item | Detail |
-|------|--------|
-| **Goal** | Marketplace-style discovery |
-| **Routes (examples)** | `/products`, `/stores`, `/search?q=` |
-| **Data** | **Tenant tables** (source of truth) + **global index / projections** (hub reads) |
-| **Design** | Do not mash hub SQL into every store query; keep hub reads explicit |
+## Product Model
 
-### Stage 4 — Performance scaling
+EcomHub is a platform where merchants create their own storefronts while customers discover stores and products through a shared hub.
 
-| Area | Action |
-|------|--------|
-| **PostgreSQL** | Indexes on `store_id`, `created_at`, FKs; explain slow queries |
-| **Replicas** | Read replicas when read load dominates (later) |
-| **Redis** | Sessions, hot keys, storefront fragments / rate limits |
-| **CDN** | Static assets + product images |
-
-### Stage 5 — Microservices (optional)
-
-| Trigger | When a boundary hurts (team scale, deploy risk, different SLO) |
-|---------|------------------------------------------------------------------|
-| **Splits (examples)** | Auth, Store, Product, Order, Analytics |
-| **Sync** | REST or gRPC |
-| **Async** | Queue / log (Kafka-like) for notifications, indexing, analytics |
-
-### Stage 6 — Analytics & data scaling
-
-| Piece | Role |
-|-------|------|
-| **Events** | `order_placed`, `product_viewed`, … |
-| **Pipeline** | Queue → batch → warehouse / OLAP |
-| **Store** | Separate analytics DB (not OLTP) |
-
-### Stage 7 — Search infrastructure
-
-| When | Hub / marketplace search outgrows SQL `ILIKE` |
-|------|-----------------------------------------------|
-| **Options** | Elasticsearch, Meilisearch, Typesense |
-| **Pattern** | OLTP → indexer (event or cron) → search index |
-
-### Stage 8 — Horizontal scaling
-
-| Layer | Pattern |
-|-------|---------|
-| **App** | Stateless Go instances behind load balancer |
-| **Session** | Redis or short-lived tokens (today: Clerk session JWT in HttpOnly cookie, re-verified per request) |
-| **DB** | Replicas first; sharding only with clear pain |
-
----
-
-## 3) Architecture string summary
+Current customer purchase direction:
 
 ```text
-Start:     User → Go app → PostgreSQL
-Then:      User → LB → N× Go → PostgreSQL + Redis
-Mature:    User → CDN → LB → services → PostgreSQL + Redis + Search + analytics store
+Customer visits store
+-> sees products
+-> opens product
+-> orders through merchant-managed channel
 ```
 
----
+Do not expand checkout/cart behavior until product direction is intentionally revisited.
 
-## 4) Scaling principles (do)
-
-1. **Stateless services** — state in PostgreSQL / Redis / object storage, not local memory.
-2. **Multi-tenancy early** — every tenant table row tied to `store_id`; APIs enforce scope.
-3. **Index for real queries** — composite indexes matching `WHERE store_id … ORDER BY created_at`.
-4. **Separate concerns gradually** — monolith modules before microservices.
-5. **Optimize after measuring** — traces, slow query logs, load tests.
-
----
-
-## 5) Common mistakes (don’t)
-
-| Mistake | Why it hurts |
-|---------|----------------|
-| Microservices on day one | Slow delivery, distributed debugging |
-| Ignoring tenant isolation | Data leaks, legal/reputational risk |
-| Missing `store_id` indexes | Table scans at scale |
-| Hub logic mixed into every store query | Coupling, bugs, slow evolution |
-| Overengineering before MVP | No users, complex system |
-
----
-
-## 6) PRD — MVP one-pager
-
-| Area | In scope |
-|------|----------|
-| **Product** | Multi-tenant stores + hosted storefront + hub-lite discovery |
-| **Auth** | Clerk (dashboard JS); `POST /dashboard/session` → HttpOnly cookie; `GET /api/me`; middleware verifies Clerk session JWT + `user_identities` (`provider=clerk`) |
-| **Stores** | CRUD metadata; subdomain/slug; user owns 1+ stores |
-| **Products** | CRUD; name, description, price, stock, images |
-| **Storefront** | Public home + product detail (subdomain) |
-| **Commerce** | Cart, checkout, order create; **mock payment OK** |
-| **Hub** | Global product list, store list, basic search |
-| **NFRs** | HTTPS; validation; typical API under 300 ms; stateless; backups |
-
-**Out of scope (MVP):** theme marketplace, heavy analytics UI, commission engine, native apps, reco engine, deep shipping integrations.
-
----
-
-## 7) Data model quick reference
+## Core Data Model
 
 | Entity | Key fields |
-|--------|------------|
-| **User** | `id`, `email`, `password_hash` (nullable for external-auth-only), `created_at` |
-| **UserIdentity** | `user_id`, `provider` (`clerk`), `provider_subject` (Clerk user id / JWT `sub`), `provider_email`, unique `(provider, provider_subject)` |
-| **Store** | `id`, `user_id`, `name`, `subdomain`, `description`, `status` (`active` \| `suspended` \| `deleted`), `created_at` |
-| **Product** | `id`, `store_id`, `name`, `description`, `price`, `stock`, `image_url`, `created_at` |
-| **Order** | `id`, `store_id`, `total_price`, `status`, `created_at` |
-| **OrderItem** | `id`, `order_id`, `product_id`, `quantity`, `price` |
+| --- | --- |
+| `users` | internal user profile |
+| `user_identities` | maps Clerk `sub` to internal `users.id` |
+| `stores` | `user_id`, `name`, `subdomain`, `description`, `status`, `theme_config` |
+| `products` | `store_id`, `name`, `description`, `price`, `stock`, `image_url` |
+| `orders` | `store_id`, total/status fields |
 
-**Rule:** any row that “belongs to a store” includes `store_id` and is queried with it.
+Rules:
 
----
+- Tenant-owned rows must be scoped through `store_id` or `user_id`.
+- Store ownership checks must use `WHERE id = ? AND user_id = ?`.
+- Product deletion and updates must verify ownership through the product's store.
 
-## 8) API surface (examples)
+## Route Map
 
-| Domain | Examples |
-|--------|----------|
-| **Auth** | `POST /dashboard/session` (JSON `session_token` or `access_token`, optional `next`); `POST /api/logout`; `GET /api/me` (cookie or `Authorization: Bearer` Clerk session JWT) — details: [AUTH-BRIDGE.md](./AUTH-BRIDGE.md) |
-| **Stores** | `POST /api/stores`, `GET /api/stores` |
-| **Products** | `POST /api/products`, `GET /api/products`, `PUT /api/products/{id}`, `DELETE /api/products/{id}` |
-| **Orders** | `POST /api/orders`, `GET /api/orders` |
-| **Public** | `GET /s/{subdomain}`, `GET /s/{subdomain}/products/{id}`, … |
-| **Hub** | `GET /products`, `GET /stores`, `GET /search?q=` |
+Current public SSR routes:
 
-*(Adjust paths to match your router; keep **tenant** vs **hub** routes mentally separate.)*
+```text
+GET /
+GET /products
+GET /stores
+GET /search?q=<term>
+GET /s/:subdomain
+GET /s/:subdomain/products/:id
+GET /s/:subdomain/cart
+```
 
----
+Current dashboard SSR routes:
 
-## 9) Implementation milestones (checklist)
+```text
+GET  /dashboard
+GET  /dashboard/stores
+POST /dashboard/stores
+GET  /dashboard/stores/:id/theme
+GET  /dashboard/products
+POST /dashboard/products
+```
 
-- [x] **Foundation:** Go app, Postgres migrations (`001` init + `002` identities / `stores.status`), Clerk session JWT auth + JIT `user_identities`
-- [x] **Store + products:** CRUD + `store_id` scoping + owner checks; partial product `PUT` uses single atomic `UPDATE`
-- [ ] **Storefront:** host-first subdomain middleware (optional `BASE_HOST`); `/s/{subdomain}` fallback exists
-- [x] **Commerce:** cookie cart → `placeOrder` (transaction + `FOR UPDATE` stock); HTML + API paths
-- [x] **Hub:** global listings + `ILIKE` search (`/products`, `/stores`, `/search`)
+Current API references live in [REST-API-REFERENCE.md](./REST-API-REFERENCE.md).
 
-**Notes:** Migrations re-run on each boot (keep SQL idempotent). Cart cookie is unsigned JSON; **checkout always re-validates** store, lines, and stock, so tampering cannot bypass server rules.
+## Auth Cheatsheet
 
-**Optional later (not blocking MVP):**
+See [AUTH-BRIDGE.md](./AUTH-BRIDGE.md) for full details.
 
-| Item | When it matters |
-|------|-------------------|
-| **`schema_migrations` ledger** | When you add migrations that are **not** safe to re-`EXEC` on every boot. |
-| **Cart HMAC / signed payload** | Extra tamper-evidence; **not** a substitute for checkout validation (already required). |
-| **`pg_trgm` or FTS** | When hub `ILIKE '%q%'` gets **slow** or tables are **large**; until then Postgres is fine. |
-| **Host-first tenant routing** | When deploying wildcard subdomains (`store.yourdomain.com`) so local and production tenancy logic match; keep `/s/{subdomain}` as fallback while migrating. |
+Short version:
 
-Cart HTML, `resolveCartLines`, and `placeOrder` already use **batched** `SELECT … WHERE id = ANY($ids)` (plus `FOR UPDATE` in `placeOrder`) — **no N+1** on those paths.
+```text
+Clerk browser session -> Clerk JWT -> POST /dashboard/session
+Go verifies JWT -> maps Clerk subject to users.id
+Go sets HttpOnly auth_token cookie
+Dashboard/API requests use cookie or Bearer token
+```
 
----
+Go remains the authorization authority. Frontend checks are UX only.
 
-## 10) Next artifacts (pick one)
+## UI Architecture
 
-| Deliverable | Use when |
-|-------------|----------|
-| **Auth bridge** | Onboarding engineers or auditing Clerk ↔ cookie ↔ JWT behavior — [AUTH-BRIDGE.md](./AUTH-BRIDGE.md) |
-| **Go project layout** | Standardizing packages: `cmd/`, `internal/{httpserver,auth,db,tenant,hub}` |
-| **SQL schema** | Indexes + FKs + hub projection tables or materialized views |
-| **Deployment** | `Dockerfile`, `docker-compose`, env matrix, reverse proxy + TLS + wildcard DNS |
-| **Full PRD** | Stakeholder sign-off; expand acceptance criteria per feature |
+Use semantic classes that map cleanly to future React components.
 
----
+| Current class | Future component idea |
+| --- | --- |
+| `.product-media` | `<ProductImage />` wrapper |
+| `.product-media-img` | internal image element |
+| `.product-media-img--contain` | `fit="contain"` |
+| `.store-logo` | `<StoreLogo />` |
+| `.site-nav` | `<SiteNav />` |
+| `.dashboard-body .card` | dashboard-scoped card |
+| `.hub-card` | hub-scoped card |
 
-## 11) Execution order (now vs later)
+Guardrails:
 
-Use this when deciding what to build next without over-rotating architecture.
+- Do not make `.card` global until dashboard, hub, and storefront areas are reviewed.
+- Do not rely on global input styles for color/range/radio controls.
+- Do not let dashboard polish leak into storefront themes.
+- Keep storefront theme variables scoped.
 
-### Build now (fits current repo)
+## Media Policy
 
-- Stabilize Clerk auth/session path end-to-end (`/dashboard`, `/dashboard/session`, `/api/me`, logout).
-- Keep dashboard SSR-first and improve existing owner workflows (store + products CRUD).
-- Ship read-only orders listing only if backed by current endpoints/rules.
-- Keep storefront path fallback `/s/{subdomain}` as canonical until host-first routing is fully wired.
+Now:
 
-### Build later (after stable MVP usage)
+- Product images are remote merchant URLs.
+- Store logos are remote merchant URLs.
+- Use semantic media wrappers.
+- Use `cover` for cards and `contain` for detail when edges/details matter.
 
-- Host-first tenant routing (`{store}.{BASE_HOST}`) + wildcard DNS/TLS in deployment.
-- Dashboard architecture expansion (separate client-side route system) only if SSR becomes a bottleneck.
-- Global API error envelope migration (`code/message/details`) as a deliberate cross-cutting change.
-- Advanced merchant modules (order status transitions, analytics, payouts, reviews).
+Later:
 
-### Guardrails
+- Upload pipeline.
+- CDN/image optimization.
+- Focal point/crop metadata.
+- Advanced media manager.
 
-- Backend remains authorization authority; frontend guards are UX only.
-- Do not couple “quick metrics” to fake placeholders — each card must map to a real endpoint/query.
-- Avoid combining auth migration + UI architecture rewrite + contract redesign in one sprint.
+Do not import merchant product/logo images as frontend assets. Imported images are for static platform-owned assets only.
 
----
+## Theme Policy
 
-## 12) Product direction (current state -> next)
+Theme config is stored in `stores.theme_config`.
 
-### Vision
-
-Make EcomHub the easiest way for a merchant to launch and run a branded storefront, starting with a reliable core and expanding only when demand is proven.
-
-### Priority order (next 1-2 sprints)
-
-1. **Merchant activation:** reduce time from sign-in to first live product.
-2. **Reliability:** lock in auth/session and product/order API behavior with repeatable tests.
-3. **Theme-ready foundation:** add minimal per-store visual settings (color/logo/layout flag), not a full page builder.
-4. **Demand-driven expansion:** only build advanced customization/workflows after repeated merchant requests.
-
-### Success metrics
-
-- **Time to first product:** median time from first sign-in to successful `POST /api/products`.
-- **Activation rate:** percent of new merchants who publish at least one product within 24 hours.
-- **Core API reliability:** success rate for store/product CRUD and checkout endpoints.
-
-### Non-goals for current MVP stage
-
-- Drag-and-drop storefront builder.
-- Full CMS/plugin system.
-- Large frontend architecture rewrite without usage evidence.
-
----
-
-## 13) Store UI customization v1 plan
-
-### Goal
-
-Let merchants safely customize a storefront's basic visual identity without introducing a page builder or frontend rewrite.
-
-### Scope for v1
+Current high-value fields:
 
 - `primary_color`
 - `accent_color`
+- `page_bg`
+- `text_color`
+- `card_bg`
+- `footer_bg`
 - `logo_url`
-- `layout_preset` (`default` or `compact`)
+- `layout_preset`
+- `rounding`
 
-### Implementation order
+Rules:
 
-1. **Backend core:** persist `theme_config`, validate values, expose authenticated read/update endpoints.
-2. **Dashboard editor:** add a merchant-only theme editor page under `/dashboard/stores/{id}/theme`.
-3. **Live preview:** use vanilla JS + CSS variables to inject theme values into the real storefront iframe, keeping dashboard and storefront styles isolated.
-4. **Storefront application:** apply saved theme values to storefront templates once the editor workflow is stable.
+- No arbitrary CSS.
+- Validate colors and URLs server-side.
+- Storefront pages read theme through scoped CSS variables.
+- Theme editor preview should mirror real storefront behavior.
 
-### Technical approach
+See [THEME-CUSTOMIZATION.md](./THEME-CUSTOMIZATION.md).
 
-- Keep dashboard pages SSR-first with templates in `internal/web/templates`.
-- Reuse backend auth middleware and owned-store authorization helpers.
-- Save changes through the existing REST API instead of creating a separate HTML save path.
-- Keep customization config-driven; do not allow arbitrary merchant CSS or HTML.
+## Future Next.js/Vercel Direction
 
-### Guardrails
+Do this gradually:
 
-- Use safe defaults for stores with no theme data.
-- Validate colors, URLs, and layout preset values server-side.
-- Keep theme editor UI and storefront theme application as separate reviewable changes when possible.
-- Treat drag-and-drop builders, arbitrary markup, and advanced layout systems as post-MVP work.
+1. Keep Go SSR stable.
+2. Add public JSON endpoints for storefront data.
+3. Build Next.js storefront first.
+4. Use Vercel for frontend/subdomain routing.
+5. Move dashboard later only if needed.
 
----
+Recommended future public endpoints:
 
-*Principle to remember:* **correct tenancy + schema beats premature infra.** Scaling gets easier when every request has an explicit `store_id` and hub reads are a deliberate layer.
+```text
+GET /api/public/stores/:subdomain
+GET /api/public/stores/:subdomain/products
+GET /api/public/stores/:subdomain/products/:id
+GET /api/public/hub/products
+GET /api/public/hub/stores
+GET /api/public/search?q=<term>
+```
+
+## Priority Order
+
+Now:
+
+1. Stabilize storefront/product UX.
+2. Keep dashboard store/product management reliable.
+3. Harden auth/session behavior.
+4. Clean API boundaries.
+5. Improve visual consistency with scoped styles.
+
+Later:
+
+1. CSRF tokens for destructive dashboard forms.
+2. Public API endpoints for Next.js.
+3. Host/subdomain routing.
+4. Store logo upload and media infrastructure.
+5. Next.js storefront migration.
+6. Dashboard migration if SSR becomes limiting.
+
+## Non-Goals For MVP
+
+- Full page builder.
+- Arbitrary merchant CSS.
+- Crop tool.
+- Upload/CDN pipeline.
+- Microservices.
+- Full frontend rewrite before API contracts exist.
+
+## Principle
+
+Ship the reliable core first. Keep class names, API shapes, and theme semantics clean enough that the future Next.js frontend can reuse the same product language.

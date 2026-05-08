@@ -1,75 +1,40 @@
 # Store Theme Customization
 
-## Overview
+EcomHub themes let merchants make their storefront feel owned without creating an unsafe custom-CSS system.
 
-EcomHub allows merchants to customize the appearance of their storefronts through a live theme editor on the merchant dashboard. Phase 1 focuses on core customization: primary color, accent color, logo, and layout presets.
+The current theme model is intentionally small:
 
----
+- Brand colors.
+- Page/card/footer colors.
+- Logo URL.
+- Layout preset.
+- Rounding.
 
-## Phase 1: MVP Features
+Merchant media remains URL-based for now. Do not add upload, crop, CDN, or image transformation logic during the MVP theme phase.
 
-### What merchants can customize
+## Current Flow
 
-- **Primary Color**: Main brand color (CTA buttons, links, accents) — hex value
-- **Accent Color**: Secondary highlight color (alerts, badges, decorative elements) — hex value
-- **Logo**: Store logo displayed in storefront header — HTTPS image URL
-- **Layout Preset**: `default` (full product cards) or `compact` (condensed cards)
-
-### User Experience
-
-1. Merchant navigates to **Dashboard** → click "theme editor" link next to store name
-2. Theme Editor page loads with:
-   - **Controls panel** (left): Color pickers (HTML5 `<input type="color">`) + hex input fields, logo URL input, layout toggle
-   - **Preview panel** (right): Real storefront iframe with live CSS variable injection, plus a local preview surface for quick UI feedback
-3. Merchant adjusts colors/logo/layout, sees preview update instantly
-4. Clicks "Save theme" button
-5. Changes persist to database and apply immediately on storefront
-
-### Technical Implementation
-
-#### Route & Handler
-
+```text
+Dashboard -> Store card -> Edit Theme -> Theme editor -> Storefront preview
 ```
+
+The theme editor is a dashboard page:
+
+```text
 GET /dashboard/stores/:id/theme
 ```
 
-Handled by `Server.dashboardStoreThemeGet()` in `handlers_html.go`:
-- Parses store ID from URL parameter
-- Validates ownership via `loadOwnedStore(ctx, userID, storeID)` (404 if not owner)
-- Loads current theme via `loadStoreThemeByID(ctx, storeID)`
-- Renders `theme_editor.html` template with store + theme data
+The authenticated API update endpoint is:
 
-#### API Endpoint
-
-```
+```text
 PUT /api/stores/:id/theme
 ```
 
-Requires authenticated user. Handled by `Server.apiUpdateStoreTheme()` in `handlers_api.go`:
+Both paths must enforce store ownership.
 
-**Request body:**
+## Theme Shape
 
-```json
-{
-  "primary_color": "#1d9bf0",
-  "accent_color": "#00ba7c",
-  "page_bg": "#ffffff",
-  "text_color": "#111111",
-  "card_bg": "#f9fafb",
-  "footer_bg": "#ffffff",
-  "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default",
-  "rounding": 0.4
-}
-```
-
-- All fields are optional (patch semantics)
-- `primary_color`, `accent_color`, `page_bg`, `text_color`, `card_bg`, `footer_bg` must be valid hex (#RRGGBB) or omitted
-- `logo_url` must be an absolute HTTP(S) URL or omitted
-- `layout_preset` must be `default` or `compact` or omitted
-- `rounding` must be a number between `0.0` and `1.0` or omitted
-
-**Response (200 OK):**
+Theme config is stored in `stores.theme_config` as JSONB and normalized into `StoreTheme`.
 
 ```json
 {
@@ -87,263 +52,181 @@ Requires authenticated user. Handled by `Server.apiUpdateStoreTheme()` in `handl
 }
 ```
 
-#### Data Model
+## Validation Rules
 
-`StoreTheme` struct in `models.go`:
+- Colors must be `#RRGGBB` hex values.
+- `logo_url` must be empty or an absolute HTTP(S) URL.
+- `layout_preset` must be `default` or `compact`.
+- `rounding` must stay in the supported numeric range.
+- Invalid or missing theme JSON should fall back to a valid renderable default.
 
-```go
-type StoreTheme struct {
-	PrimaryColor string  `json:"primary_color"`
-	AccentColor  string  `json:"accent_color"`
-	LogoURL      string  `json:"logo_url,omitempty"`
-	LayoutPreset string  `json:"layout_preset"`
-	Preset       string  `json:"preset"`
-	Rounding     float64 `json:"rounding"`
-	Version      int     `json:"version"`
-	PageBg       string  `json:"page_bg"`
-	TextColor    string  `json:"text_color"`
-	CardBg       string  `json:"card_bg"`
-	FooterBg     string  `json:"footer_bg"`
-}
-```
+## Storefront Scoping
 
-Stored as JSONB in `stores.theme_config` column.
-
-#### Database Schema
-
-```sql
-ALTER TABLE stores ADD COLUMN theme_config JSONB NOT NULL DEFAULT '{"primary_color":"#1d9bf0","accent_color":"#00ba7c","logo_url":"","layout_preset":"default"}';
-```
-
-(Already present in migrations.)
-
-#### Storefront CSS Application
-
-Store pages use a storefront-specific body class and inline CSS variables via template context:
+Storefront pages use a dedicated body scope:
 
 ```html
-<body class="store-page storefront preset-{{.Theme.Preset}}" style="--page-bg: {{.Theme.PageBg}}; --text-color: {{.Theme.TextColor}}; --card-bg: {{.Theme.CardBg}}; --footer-bg: {{.Theme.FooterBg}}; --accent-color: {{.Theme.AccentColor}}; --store-primary: {{.Theme.PrimaryColor}}; --store-accent: {{.Theme.AccentColor}}; --store-bg: {{.Theme.PageBg}}; --store-text: {{.Theme.TextColor}}; --store-card: {{.Theme.CardBg}}; --store-footer: {{.Theme.FooterBg}}; --rounding: {{.Theme.Rounding}}">
+<body class="store-page storefront preset-{{.Theme.Preset}}" style="...">
 ```
 
-This keeps storefront theme styles scoped to the `.storefront` body context and prevents dashboard header leakage.
+Theme variables should stay scoped to storefront contexts so dashboard, hub, and public site styles do not leak into merchant themes.
 
-#### Storefront header scoping
-
-The storefront header is styled using store-scoped variables:
+Important variables:
 
 ```css
-body.storefront .site-header,
-body.storefront .site-header.themed {
-  background: var(--store-primary, var(--primary-color, #111111));
-}
+--store-primary
+--store-accent
+--store-bg
+--store-text
+--store-card
+--store-footer
+--rounding
 ```
 
-The theme editor's live preview injection writes both scoped and fallback variables into the iframe root:
+## Logo Rendering
 
-```js
-root.style.setProperty("--store-primary", primary);
-root.style.setProperty("--primary-color", primary);
-```
+Logo support is URL-based.
 
-That makes the storefront header update instantly in the preview while keeping dashboard styles separate.
+Storefront header behavior:
 
-#### Dynamic Header Branding
+- If `Theme.LogoURL` exists, render the logo image.
+- If missing, fall back to the store name.
 
-The storefront header (`layout.html`) displays the store logo when available, otherwise it renders the store name as text. Theme colors are applied through scoped CSS variables rather than inline background styling.
+Current semantic contract:
 
-This is implemented using Go template `{{with}}` blocks to safely handle missing data:
 ```html
-{{with .Store}}
-  {{with .Theme.LogoURL}}
-    <img src="{{.}}" alt="{{$.Store.Name}}">
+<a class="brand" href="/s/{{.Store.Subdomain}}" data-store-name="{{.Store.Name}}">
+  {{if and .Theme .Theme.LogoURL}}
+    <img class="store-logo" src="{{.Theme.LogoURL}}" alt="{{.Store.Name}}">
   {{else}}
-    <span class="brand">{{.Name}}</span>
+    {{.Store.Name}}
   {{end}}
-{{else}}
-  <a class="brand" href="/">EcomHub</a>
-{{end}}
+</a>
 ```
 
-#### Helper Functions
+CSS:
 
-**`loadOwnedStore(ctx, userID, storeID)`** — `handlers_html.go`
-- Single query with ownership filter: `WHERE id = $1 AND user_id = $2`
-- Returns `pgx.ErrNoRows` if store not found OR not owned (intentional — don't leak store existence)
+```css
+.store-logo {
+  max-height: 44px;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+```
 
-**`loadStoreThemeByID(ctx, storeID)`** — `handlers_api.go`
-- Fetches theme config from `stores.theme_config`
-- Returns default theme if JSON parsing fails
+This maps cleanly to a future Next.js component:
 
-**Validation functions** — `handlers_api.go`
-- `normalizeColor(value, fallback)` — validates hex format, returns fallback if empty
-- `normalizeLogoURL(value)` — validates absolute HTTPS/HTTP URLs
-- `normalizeLayoutPreset(value)` — validates `default` or `compact`
-- `normalizeStoreTheme(body)` — full validation pipeline for POST body
-- `normalizeStoreThemePatch(current, patch)` — partial validation for PATCH updates
+```tsx
+<StoreLogo src={theme.logoUrl} fallback={store.name} />
+```
 
----
+## Product Media Contract
 
-## Phase 2: Enhanced Customization (Roadmap)
+Product images use shared semantic classes instead of page-specific image hacks.
 
-- **Fonts**: Select from preset font families (sans/serif/mono) + scale presets
-- **Advanced Layout**: Sidebar position, product grid columns, spacing/padding
-- **Typography**: Adjust heading/body font sizes, weights, line-height
-- **Sections**: Customize colors for specific sections (header, footer, cards)
-- **Behavior-linked layout** (optional): Layout preset affects product query density (compact preset fetches minimal fields; default fetches rich data with ratings/descriptions)
+Card/list images:
 
-#### Implementation notes
-- Extend `StoreTheme` struct with new fields
-- Add font selection UI to theme editor
-- Update storefront CSS to read new variables
-- Database migration: add new fields to `theme_config` JSON
-- For behavior-linked layout: coordinate with product fetch layer in `handlers_html.go`
+```html
+<div class="product-media">
+  <img class="product-media-img" src="{{.ImageURL}}" alt="{{.Name}}">
+</div>
+```
 
----
+Detail images:
 
-## Phase 3: Social & Gallery (Roadmap)
+```html
+<div class="product-media product-media-detail">
+  <img class="product-media-img product-media-img--contain" src="{{.ImageURL}}" alt="{{.Name}}">
+</div>
+```
 
-- **Theme Gallery**: Browse and apply pre-built theme templates by category
-- **Snapshots**: Share theme snapshots (read-only preview link)
-- **Recommendations**: Suggest themes based on store category
-- **Community Themes**: One-click apply community-created themes
+Policy:
 
----
+- Marketplace cards use `cover`.
+- Storefront grids use `cover`.
+- Product detail can use `contain` when edges/details matter.
+- Wrapper controls layout/aspect ratio.
+- Image controls rendering fit.
 
-## Testing
+Future Next.js mapping:
 
-### Manual Testing
+```tsx
+<ProductImage src={product.imageUrl} alt={product.name} fit="cover" />
+```
 
-1. **Happy path:**
-   - Sign in to dashboard
-   - Click "theme editor" on a store
-   - Adjust color picker (verify preview updates in real time)
-   - Adjust hex input manually (verify color picker syncs)
-   - Enter logo URL (verify preview logo appears)
-   - Toggle layout preset (verify preview card layout changes)
-   - Click "Save theme"
-   - Verify success message appears
-   - Refresh page — verify theme persists
-   - Navigate to store front — verify colors/logo/layout applied
+## Theme Editor Preview
 
-2. **Edge cases:**
-   - Invalid hex color (non-hex text in hex input) → "Save failed" message
-   - Invalid logo URL (not http/https, not absolute) → "Save failed" message
-   - Non-owner accessing other's theme editor → 404
-   - Missing theme_config column → returns default theme, still saveable
+The theme editor should update the preview without requiring a full page reload.
 
-### Unit Tests
+Expected live behavior:
 
-- `normalizeColor()` validates hex, returns fallback if empty
-- `normalizeLogoURL()` rejects relative URLs, non-http(s) schemes
-- `normalizeLayoutPreset()` allows `default`/`compact` only
-- `loadOwnedStore()` returns `ErrNoRows` for non-owner
-- `apiUpdateStoreTheme()` returns 403 for non-owner, 200 for owner
+- Color controls update CSS variables.
+- Logo URL updates the `.site-header .brand` content inside the preview iframe.
+- Layout preset updates the visible product-card presentation.
+- Save persists normalized JSON through `PUT /api/stores/:id/theme`.
 
-### Integration Tests
+## API Contract
 
-- POST new store, GET theme editor — returns default theme
-- PUT theme via API, GET theme editor — persists and loads correctly
-- Multiple stores — themes don't cross-contaminate
+### `GET /api/stores/:id/theme`
 
----
+Auth: required.
 
-## Invariants (Enforced)
+Caller must own the store.
 
-These guarantees are built into the system:
+Returns the normalized theme.
 
-1. **Renderability**: Every store always has a valid, renderable theme.
-   - Missing `theme_config` → defaults applied
-   - Invalid JSON → parsed with fallbacks
-   - Storefront never 500s due to theme
+### `PUT /api/stores/:id/theme`
 
-2. **Ownership**: Only the store owner can view or modify theme.
-   - Enforced at API boundary: `loadOwnedStore(ctx, userID, storeID)` gate
-   - Non-owners receive 404 (not 403) — don't leak store existence
-   - Theme is tamper-proof
+Auth: required.
 
-3. **Consistency**: Theme changes apply atomically.
-   - Single `UPDATE stores SET theme_config = $1` query
-   - All pages see same theme within request
-   - No partial updates visible to user
+Caller must own the store.
 
-4. **Boundaries**: Theme affects presentation only within its store.
-   - CSS variables scoped to store pages
-   - No cross-store theme leakage
-   - Multi-tenant safety guaranteed
-
----
-
-## Security Considerations
-
-- **Ownership validation**: `loadOwnedStore` ensures only store owner can view/edit theme
-- **Color validation**: Prevents CSS injection via color input (hexadecimal only)
-- **Logo URL validation**: Must be absolute HTTPS/HTTP URL; prevents javascript: URLs
-- **Error messaging**: Non-owners receive 404 (not 403) to avoid leaking store existence
-- **CORS**: Theme editor is dashboard-only (not cross-origin accessible)
-- **Session Persistence**: The theme editor includes a background sync script (`clerk_sync`) to prevent logout while designing (see [AUTH-BRIDGE.md](AUTH-BRIDGE.md)).
-
----
-
-## API Contracts
-
-### GET /api/stores/:id/theme
-
-**Authentication:** Required
-
-**Response:** Returns current theme (200 OK) or 404 if store not found or not owner
+Patch body:
 
 ```json
 {
-  "primary_color": "#1d9bf0",
-  "accent_color": "#00ba7c",
+  "primary_color": "#111827",
+  "accent_color": "#16a34a",
   "logo_url": "https://example.com/logo.png",
   "layout_preset": "default"
 }
 ```
 
-### PUT /api/stores/:id/theme
+Response: full normalized theme.
 
-**Authentication:** Required
+## Security Rules
 
-**Request body:** (all fields optional)
-
-```json
-{
-  "primary_color": "#1d9bf0",
-  "accent_color": "#00ba7c",
-  "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default"
-}
-```
-
-**Responses:**
-
-- `200 OK`: Theme updated, returns full theme object
-- `400 Bad Request`: Invalid color/URL/layout format
-- `403 Forbidden`: User does not own this store
-- `404 Not Found`: Store not found
-- `500 Internal Server Error`: Database error
-
----
+- Ownership check must happen before theme reads or writes.
+- Do not allow arbitrary CSS.
+- Validate color values before writing CSS variables.
+- Validate logo URLs to prevent `javascript:` and invalid schemes.
+- Do not expose another merchant's private store/theme data through dashboard APIs.
 
 ## File Manifest
 
 | File | Purpose |
-|------|---------|
-| `internal/web/templates/theme_editor.html` | Merchant theme editor page (controls + live preview) |
-| `internal/httpserver/handlers_html.go` | `dashboardStoreThemeGet()` handler, `loadOwnedStore()` helper |
-| `internal/httpserver/handlers_api.go` | `apiUpdateStoreTheme()`, `loadStoreThemeByID()`, validation fns |
+| --- | --- |
+| `internal/web/templates/theme_editor.html` | Merchant theme editor and preview scripting |
+| `internal/web/templates/store_layout.html` | Storefront header/logo rendering and scoped theme variables |
+| `internal/web/static/style.css` | Storefront, product media, logo, and theme editor styles |
+| `internal/httpserver/handlers_html.go` | Dashboard theme editor handler and ownership helpers |
+| `internal/httpserver/handlers_api.go` | Theme API handlers and normalization |
 | `internal/models/models.go` | `StoreTheme` struct |
-| `internal/web/static/style.css` | `.theme-editor`, `.theme-preview`, `.theme-preview-card` styles |
-| `internal/web/templates/dashboard.html` | "theme editor" link in store list |
-| `internal/db/migrations/` | Migration adding `theme_config` JSONB column |
+| `migrations/` | Schema including `stores.theme_config` |
 
----
+## Roadmap
 
-## Future Enhancements
+Now:
 
-- **Import/Export**: JSON export of theme for backups / sharing
-- **Presets**: Save custom themes as named presets
-- **A/B Testing**: Show different themes to different visitor cohorts, track conversion
-- **Analytics**: See which colors/layouts drive more engagement
-- **Figma Integration**: Design system sync with Figma
+- Keep logo URL support.
+- Keep product media semantics.
+- Keep storefront theme isolation.
+- Avoid crop/upload/CDN complexity.
+
+Later:
+
+- Store logo upload.
+- Image storage and lifecycle.
+- CDN/image optimization.
+- Focal point or crop metadata.
+- Theme gallery and reusable presets.

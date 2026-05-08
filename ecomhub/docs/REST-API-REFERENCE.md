@@ -1,48 +1,38 @@
 # EcomHub REST API Reference
 
-This document describes the current authenticated JSON API surface for EcomHub.
+This document describes the current JSON API surface and the API direction needed for future frontend separation.
 
-For auth/session internals, see [AUTH-BRIDGE.md](./AUTH-BRIDGE.md).
-For product and architecture context, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHEATSHEETS.md).
+For auth internals, see [AUTH-BRIDGE.md](./AUTH-BRIDGE.md).
+For product architecture, see [ECOMHUB-CHEATSHEETS.md](./ECOMHUB-CHEATSHEETS.md).
 
----
+## Scope
 
-## Documentation Scope
-
-- This file is the **source of truth** for REST request/response contracts and status codes.
-- If an endpoint path, method, payload, auth requirement, or response changes, update this file in the same PR.
-- Keep architecture decisions in `ECOMHUB-CHEATSHEETS.md` and auth internals in `AUTH-BRIDGE.md`.
-
----
+- Current authenticated merchant APIs are served by the Go backend.
+- Current public storefront and hub pages are mostly Go SSR HTML.
+- Future Next.js storefront pages should consume stable public JSON endpoints from Go.
 
 ## Base URL
 
-- Local development: `http://localhost:8080`
+Local development:
 
----
+```text
+http://localhost:8080
+```
 
-## Auth Quickstart (Local)
+Production:
 
-1. Sign in from `http://localhost:8080/dashboard`.
-2. Verify auth is working:
-   - browser: `GET /api/me` with `credentials: "include"`, or
-   - terminal: `GET /api/me` with `Authorization: Bearer <token>`.
-3. Call protected endpoints only after `/api/me` returns `200`.
-
----
+```text
+https://your-app-origin
+```
 
 ## Authentication
 
 Protected endpoints accept either:
 
 - `Authorization: Bearer <clerk_session_jwt>`
-- `auth_token` HttpOnly cookie (set by `POST /dashboard/session`)
+- `auth_token` HttpOnly cookie set by `POST /dashboard/session`
 
-### Quick auth check
-
-- `GET /api/me` returns the resolved internal user id for a valid token/cookie.
-
-Example response:
+`GET /api/me` is the fastest auth check.
 
 ```json
 {
@@ -50,11 +40,9 @@ Example response:
 }
 ```
 
----
-
 ## Error Format
 
-Errors currently return a simple JSON object:
+Current errors use a simple object:
 
 ```json
 {
@@ -70,71 +58,64 @@ Common values:
 - `not found`
 - `invalid body`
 
----
+## Status Codes
 
-## Common Status Codes
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Successful read/update/delete |
+| `201 Created` | Resource created |
+| `400 Bad Request` | Invalid body, id, query, or validation error |
+| `401 Unauthorized` | Missing or invalid auth |
+| `403 Forbidden` | User does not own the resource |
+| `404 Not Found` | Resource does not exist or is intentionally hidden |
+| `409 Conflict` | Unique constraint conflict |
+| `500 Internal Server Error` | Unexpected server/database error |
 
-- `200 OK`: successful read/update/delete.
-- `201 Created`: resource created successfully.
-- `400 Bad Request`: invalid query/body/id format.
-- `401 Unauthorized`: missing or invalid token/cookie.
-- `403 Forbidden`: authenticated user does not own target store/resource.
-- `404 Not Found`: resource id does not exist.
-- `409 Conflict`: unique constraint conflict (for example, duplicate subdomain).
-- `500 Internal Server Error`: unexpected server/database error.
+## Auth Endpoints
 
----
+### `POST /api/logout`
 
-## Endpoints
+Auth: none
 
-### Auth
-
-#### `POST /api/logout`
-
-- Auth: none
-- Behavior: clears `auth_token` cookie
-- Response: `200 OK`
+Clears the `auth_token` cookie.
 
 ```json
 { "ok": true }
 ```
 
-#### `GET /api/me`
+### `GET /api/me`
 
-- Auth: required
-- Response: `200 OK`
+Auth: required
 
 ```json
 { "user_id": "<uuid>" }
 ```
 
----
+## Merchant Store Endpoints
 
-### Stores
+### `GET /api/stores`
 
-#### `GET /api/stores`
+Auth: required
 
-- Auth: required
-- Response: list of stores owned by the authenticated user
+Returns stores owned by the authenticated merchant.
 
 ```json
 [
   {
     "id": 11,
     "user_id": "a682e5da-7df4-474f-ac83-71cf374e13a9",
-    "name": "cch",
-    "subdomain": "cch",
-    "description": "cccc",
+    "name": "My Store",
+    "subdomain": "my-store",
+    "description": "Optional",
     "status": "active",
     "created_at": "2026-04-25T09:00:00Z"
   }
 ]
 ```
 
-#### `POST /api/stores`
+### `POST /api/stores`
 
-- Auth: required
-- Body:
+Auth: required
 
 ```json
 {
@@ -144,11 +125,14 @@ Common values:
 }
 ```
 
-- Validation:
-  - `name` required
-  - `subdomain` required and normalized/lowercased server-side
-  - subdomain must be unique
-- Response: `201 Created`
+Validation:
+
+- `name` is required.
+- `subdomain` is required.
+- `subdomain` is normalized/lowercased server-side.
+- `subdomain` must be unique.
+
+Response:
 
 ```json
 {
@@ -157,89 +141,83 @@ Common values:
 }
 ```
 
-#### `PUT /api/stores/:id`
+### `PUT /api/stores/:id`
 
-- Auth: required
-- Body:
+Auth: required
+
+Caller must own the store.
 
 ```json
 {
   "name": "Updated Store Name",
-  "subdomain": "updated-subdomain",
+  "subdomain": "updated-store",
   "description": "Updated description"
 }
 ```
 
-- Response: `200 OK`
+Response:
 
 ```json
 { "ok": true }
 ```
 
----
+## Store Theme Endpoints
 
-### Store Theme
+### `GET /api/stores/:id/theme`
 
-#### `GET /api/stores/:id/theme`
+Auth: required
 
-- Auth: optional
-- Response: `200 OK` — theme configuration for the store
+Caller must own the store.
 
-```json
-{
-  "primary_color": "#1d9bf0",
-  "accent_color": "#00ba7c",
-  "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default"
-}
-```
-
-- Note: returns default theme if no custom theme set
-
-#### `PUT /api/stores/:id/theme`
-
-- Auth: required
-- Body: (all fields optional — patch semantics)
+Returns the current theme or a normalized default theme.
 
 ```json
 {
   "primary_color": "#1d9bf0",
   "accent_color": "#00ba7c",
+  "page_bg": "#ffffff",
+  "text_color": "#111111",
+  "card_bg": "#f9fafb",
+  "footer_bg": "#ffffff",
   "logo_url": "https://example.com/logo.png",
-  "layout_preset": "default"
+  "layout_preset": "default",
+  "rounding": 0.4,
+  "preset": "minimal",
+  "version": 1
 }
 ```
 
-- Validation:
-  - `primary_color` must be valid hex (#RRGGBB) or omitted
-  - `accent_color` must be valid hex or omitted
-  - `logo_url` must be absolute HTTP(S) URL or empty string, omitted
-  - `layout_preset` must be `default` or `compact` or omitted
-- Authorization:
-  - caller must own the target store (returns `403 Forbidden` if not)
-- Response: `200 OK` — full updated theme
+### `PUT /api/stores/:id/theme`
+
+Auth: required
+
+Patch semantics: include only the fields to change.
 
 ```json
 {
-  "primary_color": "#1d9bf0",
-  "accent_color": "#00ba7c",
+  "primary_color": "#111827",
+  "accent_color": "#16a34a",
   "logo_url": "https://example.com/logo.png",
   "layout_preset": "default"
 }
 ```
 
----
+Validation:
 
-### Products
+- Color fields must be valid `#RRGGBB` hex values or omitted.
+- `logo_url` must be an absolute HTTP(S) URL, empty, or omitted.
+- `layout_preset` must be `default` or `compact`.
+- Caller must own the store.
 
-#### `GET /api/products?store_id=<id>`
+Response: full normalized theme.
 
-- Auth: required
-- Query:
-  - `store_id` required, positive integer
-- Authorization:
-  - caller must own the target store
-- Response: list of products for the store
+## Product Endpoints
+
+### `GET /api/products?store_id=<id>`
+
+Auth: required
+
+Caller must own the store.
 
 ```json
 [
@@ -256,10 +234,9 @@ Common values:
 ]
 ```
 
-#### `POST /api/products`
+### `POST /api/products`
 
-- Auth: required
-- Body:
+Auth: required
 
 ```json
 {
@@ -268,27 +245,29 @@ Common values:
   "description": "Optional",
   "price": 12.5,
   "stock": 7,
-  "image_url": ""
+  "image_url": "https://example.com/product.jpg"
 }
 ```
 
-- Validation:
-  - `store_id` required
-  - `name` required
-  - `price >= 0`
-  - `stock >= 0`
-- Authorization:
-  - caller must own `store_id`
-- Response: `201 Created`
+Validation:
+
+- `store_id` is required.
+- `name` is required.
+- `price >= 0`.
+- `stock >= 0`.
+- Caller must own the store.
+
+Response:
 
 ```json
 { "id": 3 }
 ```
 
-#### `PUT /api/products/:id`
+### `PUT /api/products/:id`
 
-- Auth: required
-- Body: partial update; include only fields you want to change
+Auth: required
+
+Partial update.
 
 ```json
 {
@@ -296,234 +275,94 @@ Common values:
   "description": "Updated",
   "price": 15.99,
   "stock": 4,
-  "image_url": ""
+  "image_url": "https://example.com/new.jpg"
 }
 ```
 
-- Validation:
-  - if provided, `price >= 0`
-  - if provided, `stock >= 0`
-- Authorization:
-  - caller must own the store for the product id
-- Response: `200 OK`
+Response:
 
 ```json
 { "ok": true }
 ```
 
-#### `DELETE /api/products/:id`
+### `DELETE /api/products/:id`
 
-- Auth: required
-- Authorization:
-  - caller must own the store for the product id
-- Response: `200 OK`
+Auth: required
 
-```json
-{ "ok": true }
-```
-
----
-
-### Cart
-
-#### `GET /api/cart`
-
-- Auth: required
-- Response:
-
-```json
-{
-  "store_id": 11,
-  "lines": [
-    {
-      "product_id": 1,
-      "name": "Black Hoodie",
-      "quantity": 2,
-      "unit_price": 49.99,
-      "line_total": 99.98
-    }
-  ],
-  "total": 99.98
-}
-```
-
-#### `POST /api/cart/add`
-
-- Auth: required
-- Body:
-
-```json
-{
-  "product_id": 1,
-  "quantity": 1
-}
-```
-
-- Behavior:
-  - enforces single-store cart
-  - validates stock
-- Response: `200 OK`
+Caller must own the product's store.
 
 ```json
 { "ok": true }
 ```
 
-#### `POST /api/cart/remove`
+## Cart And Orders
 
-- Auth: required
-- Body:
+These endpoints still exist, but current MVP customer purchasing direction is WhatsApp/manual merchant completion rather than a full checkout system.
 
-```json
-{
-  "product_id": 1
-}
+Do not expand cart/checkout behavior until the product direction is confirmed.
+
+Current endpoints:
+
+- `GET /api/cart`
+- `POST /api/cart/add`
+- `POST /api/cart/remove`
+- `POST /api/cart/clear`
+- `POST /api/orders`
+- `GET /api/orders`
+
+## Current Public HTML Endpoints
+
+These are rendered by Go templates today:
+
+- `GET /`
+- `GET /products`
+- `GET /stores`
+- `GET /search?q=<term>`
+- `GET /s/:subdomain`
+- `GET /s/:subdomain/products/:id`
+- `GET /s/:subdomain/cart`
+
+## Future Public JSON Endpoints
+
+These are the recommended API boundary for the future Next.js storefront:
+
+```text
+GET /api/public/stores/:subdomain
+GET /api/public/stores/:subdomain/products
+GET /api/public/stores/:subdomain/products/:id
+GET /api/public/hub/products
+GET /api/public/hub/stores
+GET /api/public/search?q=<term>
 ```
 
-- Response: `200 OK`
+Guidelines:
 
-```json
-{ "ok": true }
-```
+- Return stable JSON independent of Go templates.
+- Include `theme`, `store`, and `products` shapes needed by storefront pages.
+- Keep merchant-owned media as remote URLs (`image_url`, `logo_url`).
+- Do not expose private merchant fields.
+- Use the same semantic rendering intent as the current frontend: product cards use cover images, product detail can use contain images.
 
-#### `POST /api/cart/clear`
-
-- Auth: required
-- Response: `200 OK`
-
-```json
-{ "ok": true }
-```
-
----
-
-### Orders
-
-#### `POST /api/orders`
-
-- Auth: required
-- Body (optional store assertion):
-
-```json
-{
-  "store_id": 11
-}
-```
-
-- Behavior:
-  - validates cart ownership and stock
-  - places order transactionally
-  - decrements stock
-  - clears cart cookie on success
-- Response: `201 Created`
-
-```json
-{
-  "order_id": 42,
-  "total": 99.98
-}
-```
-
-#### `GET /api/orders`
-
-- Auth: required
-- Response: list of orders for authenticated user
-
----
-
-## Public HTML Endpoints (non-JSON)
-
-These are useful for manual product/store verification:
-
-- `GET /products` (hub products page)
-- `GET /stores` (hub stores page)
-- `GET /search?q=<term>` (hub search page)
-- `GET /s/:subdomain` (storefront home)
-- `GET /s/:subdomain/products/:id` (storefront product detail)
-- `GET /s/:subdomain/cart` (store cart page)
-
----
-
-## Manual Smoke Test Checklist
-
-1. `GET /health` returns `200`.
-2. `GET /api/me` with auth returns `200`.
-3. Create store (if needed): `POST /api/stores`.
-4. Product CRUD:
-   - `POST /api/products`
-   - `PUT /api/products/:id`
-   - `DELETE /api/products/:id`
-5. Confirm product list: `GET /api/products?store_id=<id>`.
-6. Cart/order flow:
-   - `POST /api/cart/add`
-   - `GET /api/cart`
-   - `POST /api/orders`
-   - `GET /api/orders`
-
----
-
-## Product CRUD Examples
-
-### Browser console (cookie auth)
+## Browser Console Example
 
 ```js
-const storeId = 11;
-const created = await fetch('/api/products', {
-  method: 'POST',
-  credentials: 'include',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    store_id: storeId,
-    name: 'CRUD Test Product',
-    description: 'Initial',
-    price: 12.5,
-    stock: 7,
-    image_url: ''
-  })
+const me = await fetch('/api/me', {
+  credentials: 'include'
 }).then(r => r.json());
-
-const productId = created.id;
-
-await fetch(`/api/products/${productId}`, {
-  method: 'PUT',
-  credentials: 'include',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ name: 'CRUD Test Product (Edited)', price: 15.99, stock: 4 })
-});
-
-await fetch(`/api/products/${productId}`, { method: 'DELETE', credentials: 'include' });
 ```
 
-### PowerShell (Bearer auth)
+## PowerShell Example
 
 ```powershell
 $base = "http://localhost:8080"
 $token = "PASTE_SESSION_TOKEN"
 $auth = @{ Authorization = "Bearer $token" }
 
-$created = Invoke-RestMethod -Uri "$base/api/products" -Method Post `
-  -Headers ($auth + @{ "Content-Type" = "application/json" }) `
-  -Body (@{
-    store_id    = 11
-    name        = "CRUD Test Product"
-    description = "Initial"
-    price       = 12.50
-    stock       = 7
-    image_url   = ""
-  } | ConvertTo-Json -Compress)
-
-$productId = $created.id
-
-Invoke-RestMethod -Uri "$base/api/products/$productId" -Method Put `
-  -Headers ($auth + @{ "Content-Type" = "application/json" }) `
-  -Body (@{ name = "CRUD Test Product (Edited)"; price = 15.99; stock = 4 } | ConvertTo-Json -Compress)
-
-Invoke-RestMethod -Uri "$base/api/products/$productId" -Method Delete -Headers $auth
+Invoke-RestMethod -Uri "$base/api/me" -Headers $auth
 ```
-
----
 
 ## Notes
 
-- Token and cookie issues are the most common local-dev failures; see troubleshooting in [AUTH-BRIDGE.md](./AUTH-BRIDGE.md).
-- API currently uses a simple `{"error":"..."}` contract rather than a versioned error envelope.
-- Avoid sharing live JWTs in chat, screenshots, or logs; use short-lived local tokens and refresh after debugging.
+- Avoid sharing live JWTs in chats, screenshots, or logs.
+- API errors are not versioned yet.
+- Add CSRF protection before serious production use of destructive cookie-authenticated POST actions.

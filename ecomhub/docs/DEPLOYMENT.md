@@ -1,59 +1,98 @@
 # Deployment Guide
 
-EcomHub is a Go application with a PostgreSQL database and Clerk authentication.
+EcomHub currently deploys as a Go/Gin application with PostgreSQL and Clerk authentication.
 
-## Recommended: Render (Easiest)
+The recommended MVP deployment is:
 
-Render is the simplest path for this stack.
+```text
+Browser -> Go SSR/API on Render -> PostgreSQL
+                         |
+                         +-> Clerk for identity/session tokens
+```
 
-### 1. Create a PostgreSQL Database
-- Go to [dashboard.render.com](https://dashboard.render.com)
-- New → Database
-- Name: `ecomhub-db`
-- Copy the **Internal Database URL** for later.
+The future frontend direction is:
 
-### 2. Create a Web Service
-- New → Web Service
-- Connect your GitHub repository.
-- **Language**: `Go`
-- **Build Command**: `go build -o ecomhub ./cmd/server`
-- **Start Command**: `./ecomhub`
+```text
+Browser -> Next.js on Vercel -> Go API on Render -> PostgreSQL
+                                |
+                                +-> Clerk for identity/session tokens
+```
 
-### 3. Environment Variables
-Add these in the Render dashboard:
-- `DATABASE_URL`: (Paste your Internal Database URL)
-- `CLERK_SECRET_KEY`: (Your Clerk Secret Key)
-- `CLERK_PUBLISHABLE_KEY`: (Your Clerk Publishable Key)
-- `ENVIRONMENT`: `production`
-- `APP_URL`: `https://your-app-name.onrender.com`
-- `PORT`: `8080` (Render will use this)
+Do not move everything at once. Keep the Go SSR app working while API boundaries are made ready for a gradual Next.js migration.
 
----
+## Render
 
-## Alternative: Fly.io (Docker-based)
+Render is the simplest current production path.
 
-If you prefer Fly.io, use the provided `Dockerfile`.
+### 1. Create PostgreSQL
 
-1. **Install Fly CLI** and run `fly launch`.
-2. It will detect the `Dockerfile`.
-3. Create a **Postgres cluster** when prompted.
-4. Set secrets:
-   ```bash
-   fly secrets set CLERK_SECRET_KEY=... CLERK_PUBLISHABLE_KEY=... ENVIRONMENT=production APP_URL=...
-   ```
+1. Open [Render](https://dashboard.render.com).
+2. Create a new PostgreSQL database.
+3. Copy the internal database URL.
 
----
+### 2. Create Web Service
 
-## Production Checklist
+1. Create a new web service from the GitHub repository.
+2. Use Go as the runtime.
+3. Set the build command:
 
-### 1. Database Migrations
-The app currently doesn't run migrations automatically on start. 
-**Action**: You should run the `.sql` files in `migrations/` against your production database using a tool like `psql` or a Go migration library.
+```bash
+go build -o ecomhub ./cmd/server
+```
 
-### 2. Clerk Configuration
-In the [Clerk Dashboard](https://dashboard.clerk.com):
-- Add your production URL (`https://your-app-name.onrender.com`) to **Authorized Origins**.
-- Ensure the **JWT template** matches the one used in development (standard Clerk session).
+4. Set the start command:
+
+```bash
+./ecomhub
+```
 
 ### 3. Environment Variables
-Ensure `ENVIRONMENT` is set to `production`. This enables secure cookie settings (SameSite=Lax, Secure=true).
+
+Set these in Render:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `CLERK_SECRET_KEY` | Clerk backend secret key |
+| `CLERK_PUBLISHABLE_KEY` | Clerk browser publishable key |
+| `CLERK_FRONTEND_API` | Optional Clerk frontend origin override |
+| `CLERK_AUTHORIZED_PARTIES` | Optional exact browser origins allowed in Clerk JWT `azp` |
+| `ENVIRONMENT` | Use `production` in production |
+| `APP_URL` | Public app URL, for example `https://ecomhub-wd00.onrender.com` |
+| `PORT` | Render provides this automatically; `8080` is fine locally |
+
+## Database Migrations
+
+The app does not currently run migrations automatically at startup.
+
+Run the SQL files in `migrations/` against the production database before serving traffic. Use `psql`, a migration tool, or a controlled deployment step.
+
+## Clerk Checklist
+
+In the Clerk dashboard:
+
+- Add local and production origins to allowed origins/redirect URLs.
+- Use separate Clerk instances or keys for development and production.
+- Make sure `APP_URL` and `CLERK_AUTHORIZED_PARTIES` match the browser origin that receives Clerk session JWTs.
+- In production, use HTTPS only.
+
+## Future Vercel / Next.js Deployment
+
+Vercel is attractive for the future storefront because it supports frontend routing and wildcard subdomain patterns.
+
+Recommended migration path:
+
+1. Keep Go SSR on Render working.
+2. Add stable public JSON endpoints in Go for storefront data.
+3. Build the Next.js storefront first.
+4. Route storefront traffic through Vercel.
+5. Move dashboard pages later if the API boundary is clean.
+
+Do not start with a full rewrite. Subdomain routing is a good reason to introduce Vercel later, but the backend API contract should come first.
+
+## Production Hardening
+
+- Add CSRF tokens for destructive dashboard POST forms.
+- Keep `auth_token` as HttpOnly and Secure in production.
+- Avoid logging live Clerk JWTs.
+- Keep merchant media as remote URLs for now; upload/CDN/image processing can be a later subsystem.
