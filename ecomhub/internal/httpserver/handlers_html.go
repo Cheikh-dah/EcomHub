@@ -565,6 +565,32 @@ func (s *Server) dashboardCreateStore(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/dashboard")
 }
 
+func (s *Server) dashboardStoreDelete(c *gin.Context) {
+	uid, ok := middleware.UserID(c)
+	if !ok {
+		c.Redirect(http.StatusSeeOther, "/dashboard")
+		return
+	}
+
+	storeID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || storeID < 1 {
+		c.Redirect(http.StatusSeeOther, "/dashboard/stores?err=invalid_store")
+		return
+	}
+
+	if _, err := s.loadOwnedStore(c.Request.Context(), uid, storeID); err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/stores?err=not_found")
+		return
+	}
+
+	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM stores WHERE id = $1 AND user_id = $2", storeID, uid); err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/stores?err=delete_failed")
+		return
+	}
+
+	c.Redirect(http.StatusSeeOther, "/dashboard/stores")
+}
+
 func (s *Server) dashboardStoreThemeGet(c *gin.Context) {
 	storeID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || storeID < 1 {
@@ -747,6 +773,14 @@ func (s *Server) dashboardStoresGet(c *gin.Context) {
 		ClerkBootstrapJSON: clerkBootstrapJSON(s.cfg),
 		ActiveNav:          "stores",
 		Title:              "Stores",
+	}
+	switch strings.TrimSpace(c.Query("err")) {
+	case "invalid_store":
+		data.Error = "Invalid store."
+	case "not_found":
+		data.Error = "Store not found."
+	case "delete_failed":
+		data.Error = "Store could not be deleted. Remove related orders first, then try again."
 	}
 
 	rows, err := s.pool.Query(c.Request.Context(),
