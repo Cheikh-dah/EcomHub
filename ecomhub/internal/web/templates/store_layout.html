@@ -25,10 +25,10 @@
 
 {{define "store_header"}}
 <header class="site-header">
-  <a class="brand" href="/s/{{.Store.Subdomain}}">
+  <a class="brand" href="/s/{{.Store.Subdomain}}" data-store-name="{{.Store.Name}}">
     {{$name := .Store.Name}}
     {{if and .Theme .Theme.LogoURL}}
-      <img src="{{.Theme.LogoURL}}" alt="{{$name}}">
+      <img class="store-logo" src="{{.Theme.LogoURL}}" alt="{{$name}}">
     {{else}}
       {{$name}}
     {{end}}

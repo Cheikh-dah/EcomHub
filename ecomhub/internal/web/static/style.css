@@ -1183,8 +1183,14 @@ body.storefront .search-form button {
   font-size: 0.95rem;
 }
 
-.site-header .brand img {
-  max-height: 32px;
+.store-logo {
+  max-height: 44px;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+
+.site-header .brand .store-logo {
   vertical-align: middle;
 }
 

@@ -260,6 +260,7 @@
     var textColor = elTextColorHex.value.trim();
     var cardBg = elCardBgHex.value.trim();
     var footerBg = elFooterBgHex.value.trim();
+    var logo = elLogo.value.trim();
     var rounding = elRounding ? elRounding.value.trim() : '';
 
     if (isHex(primary)) {
@@ -292,6 +293,20 @@
 
     if (doc.body) {
       doc.body.classList.add("preview-mode");
+    }
+
+    var brand = doc.querySelector('.site-header .brand');
+    if (brand) {
+      var storeName = brand.getAttribute('data-store-name') || brand.textContent.trim();
+      if (/^https?:\/\/.+/.test(logo)) {
+        var img = doc.createElement('img');
+        img.className = 'store-logo';
+        img.src = logo;
+        img.alt = storeName;
+        brand.replaceChildren(img);
+      } else {
+        brand.textContent = storeName;
+      }
     }
   }
 
@@ -411,7 +426,7 @@
     iframe.addEventListener('load', applyIframePreview);
   }
 
-  [elPrimary, elAccent, elPageBg, elTextColor, elCardBg, elFooterBg].forEach(function (input) {
+  [elPrimary, elAccent, elPageBg, elTextColor, elCardBg, elFooterBg, elLogo].forEach(function (input) {
     if (input) input.addEventListener('input', applyIframePreview);
   });
 

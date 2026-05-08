@@ -12,7 +12,7 @@
     {{if and .Store .Store.Name}}{{$name = .Store.Name}}{{end}}
     
     {{if and .Theme .Theme.LogoURL}}
-      <img src="{{.Theme.LogoURL}}" alt="{{$name}}">
+      <img class="store-logo" src="{{.Theme.LogoURL}}" alt="{{$name}}">
     {{else}}
       {{$name}}
     {{end}}
