@@ -1,2 +1,4 @@
-# Local / exploratory — not part of main app
+# Local / exploratory - not part of main app
 Get idea/
+tmp/
+*.log
