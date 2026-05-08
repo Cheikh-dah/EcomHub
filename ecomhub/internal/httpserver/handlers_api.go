@@ -130,6 +130,11 @@ func (s *Server) apiCreateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "store name is required"})
+		return
+	}
 	sub := normalizeSubdomain(body.Subdomain)
 	if !subdomainRe.MatchString(sub) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subdomain"})
@@ -139,7 +144,7 @@ func (s *Server) apiCreateStore(c *gin.Context) {
 	var id int64
 	err := s.pool.QueryRow(c.Request.Context(),
 		`INSERT INTO stores (user_id, name, subdomain, description) VALUES ($1, $2, $3, $4) RETURNING id`,
-		uid, strings.TrimSpace(body.Name), sub, strings.TrimSpace(body.Description),
+		uid, name, sub, strings.TrimSpace(body.Description),
 	).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
@@ -223,6 +228,14 @@ func normalizeColor(v string, fallback string) (string, error) {
 	return s, nil
 }
 
+func normalizeFooterColor(v string, fallback string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(v))
+	if s == "transparent" {
+		return s, nil
+	}
+	return normalizeColor(s, fallback)
+}
+
 func normalizeLayoutPreset(v string) (string, error) {
 	s := strings.ToLower(strings.TrimSpace(v))
 	if s == "" {
@@ -279,10 +292,22 @@ func normalizeStoreTheme(in storeThemeBody) (models.StoreTheme, error) {
 	out.Version = in.Version
 
 	// Phase 2: Design Tokens
-	out.PageBg = in.PageBg
-	out.TextColor = in.TextColor
-	out.CardBg = in.CardBg
-	out.FooterBg = in.FooterBg
+	out.PageBg, err = normalizeColor(in.PageBg, d.PageBg)
+	if err != nil {
+		return out, err
+	}
+	out.TextColor, err = normalizeColor(in.TextColor, d.TextColor)
+	if err != nil {
+		return out, err
+	}
+	out.CardBg, err = normalizeColor(in.CardBg, d.CardBg)
+	if err != nil {
+		return out, err
+	}
+	out.FooterBg, err = normalizeFooterColor(in.FooterBg, d.FooterBg)
+	if err != nil {
+		return out, err
+	}
 
 	out.Normalize()
 
@@ -330,16 +355,28 @@ func normalizeStoreThemePatch(curr models.StoreTheme, patch storeThemeUpdateBody
 
 	// Phase 2: Design Tokens
 	if patch.PageBg != nil {
-		out.PageBg = *patch.PageBg
+		out.PageBg, err = normalizeColor(*patch.PageBg, curr.PageBg)
+		if err != nil {
+			return out, err
+		}
 	}
 	if patch.TextColor != nil {
-		out.TextColor = *patch.TextColor
+		out.TextColor, err = normalizeColor(*patch.TextColor, curr.TextColor)
+		if err != nil {
+			return out, err
+		}
 	}
 	if patch.CardBg != nil {
-		out.CardBg = *patch.CardBg
+		out.CardBg, err = normalizeColor(*patch.CardBg, curr.CardBg)
+		if err != nil {
+			return out, err
+		}
 	}
 	if patch.FooterBg != nil {
-		out.FooterBg = *patch.FooterBg
+		out.FooterBg, err = normalizeFooterColor(*patch.FooterBg, curr.FooterBg)
+		if err != nil {
+			return out, err
+		}
 	}
 
 	out.Normalize()
@@ -533,6 +570,10 @@ func (s *Server) apiUpdateProduct(c *gin.Context) {
 	nameVal := ""
 	if body.Name != nil {
 		nameVal = strings.TrimSpace(*body.Name)
+		if nameVal == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "product name is required"})
+			return
+		}
 	}
 	setDesc := body.Description != nil
 	descVal := ""
@@ -543,11 +584,19 @@ func (s *Server) apiUpdateProduct(c *gin.Context) {
 	priceVal := 0.0
 	if body.Price != nil {
 		priceVal = *body.Price
+		if priceVal < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "price must be greater than or equal to 0"})
+			return
+		}
 	}
 	setStock := body.Stock != nil
 	stockVal := 0
 	if body.Stock != nil {
 		stockVal = *body.Stock
+		if stockVal < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "stock must be greater than or equal to 0"})
+			return
+		}
 	}
 	setImg := body.ImageURL != nil
 	imgVal := ""
