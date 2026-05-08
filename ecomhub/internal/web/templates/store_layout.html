@@ -33,10 +33,10 @@
       {{$name}}
     {{end}}
   </a>
-  <nav>
-    <a href="/s/{{.Store.Subdomain}}">Home</a>
-    <a href="/s/{{.Store.Subdomain}}#products">Products</a>
-    <a href="/s/{{.Store.Subdomain}}/cart">Cart</a>
+  <nav class="site-nav" aria-label="Store navigation">
+    <a class="site-nav-link" href="/s/{{.Store.Subdomain}}">Home</a>
+    <a class="site-nav-link" href="/s/{{.Store.Subdomain}}#products">Products</a>
+    <a class="site-nav-link" href="/s/{{.Store.Subdomain}}/cart">Cart</a>
   </nav>
 </header>
 {{end}}
