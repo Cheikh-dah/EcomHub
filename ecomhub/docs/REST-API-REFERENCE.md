@@ -343,6 +343,46 @@ Guidelines:
 - Do not expose private merchant fields.
 - Use the same semantic rendering intent as the current frontend: product cards use cover images, product detail can use contain images.
 
+### `GET /api/public/stores/:subdomain`
+
+Auth: none.
+
+Returns an active public store and its normalized theme.
+
+Response:
+
+```json
+{
+  "store": {
+    "id": 11,
+    "name": "My Store",
+    "subdomain": "my-store",
+    "description": "Optional",
+    "status": "active",
+    "created_at": "2026-04-25T09:00:00Z"
+  },
+  "theme": {
+    "primary_color": "#1d9bf0",
+    "accent_color": "#00ba7c",
+    "logo_url": "https://example.com/logo.png",
+    "layout_preset": "default",
+    "preset": "minimal",
+    "rounding": 0.5,
+    "version": 1,
+    "page_bg": "#ffffff",
+    "text_color": "#111111",
+    "card_bg": "#ffffff",
+    "footer_bg": "transparent"
+  }
+}
+```
+
+Errors:
+
+- `400 Bad Request`: invalid subdomain format.
+- `404 Not Found`: store does not exist or is not active.
+- `500 Internal Server Error`: database/theme read failure.
+
 ## Browser Console Example
 
 ```js
