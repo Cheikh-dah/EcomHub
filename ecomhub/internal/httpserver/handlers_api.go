@@ -45,6 +45,19 @@ type productUpdateBody struct {
 	ImageURL    *string  `json:"image_url"`
 }
 
+type productUpdateValues struct {
+	SetName  bool
+	Name     string
+	SetDesc  bool
+	Desc     string
+	SetPrice bool
+	Price    float64
+	SetStock bool
+	Stock    int
+	SetImage bool
+	ImageURL string
+}
+
 type storeThemeBody struct {
 	PrimaryColor string  `json:"primary_color"`
 	AccentColor  string  `json:"accent_color"`
@@ -84,6 +97,48 @@ type cartRemoveBody struct {
 
 type orderCreateBody struct {
 	StoreID int64 `json:"store_id"`
+}
+
+func normalizeStoreName(v string) (string, error) {
+	name := strings.TrimSpace(v)
+	if name == "" {
+		return "", errors.New("store name is required")
+	}
+	return name, nil
+}
+
+func normalizeProductUpdate(body productUpdateBody) (productUpdateValues, error) {
+	out := productUpdateValues{}
+	if body.Name != nil {
+		out.SetName = true
+		out.Name = strings.TrimSpace(*body.Name)
+		if out.Name == "" {
+			return out, errors.New("product name is required")
+		}
+	}
+	if body.Description != nil {
+		out.SetDesc = true
+		out.Desc = strings.TrimSpace(*body.Description)
+	}
+	if body.Price != nil {
+		out.SetPrice = true
+		out.Price = *body.Price
+		if out.Price < 0 {
+			return out, errors.New("price must be greater than or equal to 0")
+		}
+	}
+	if body.Stock != nil {
+		out.SetStock = true
+		out.Stock = *body.Stock
+		if out.Stock < 0 {
+			return out, errors.New("stock must be greater than or equal to 0")
+		}
+	}
+	if body.ImageURL != nil {
+		out.SetImage = true
+		out.ImageURL = strings.TrimSpace(*body.ImageURL)
+	}
+	return out, nil
 }
 
 func (s *Server) apiLogout(c *gin.Context) {
@@ -130,9 +185,9 @@ func (s *Server) apiCreateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	name := strings.TrimSpace(body.Name)
-	if name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "store name is required"})
+	name, err := normalizeStoreName(body.Name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	sub := normalizeSubdomain(body.Subdomain)
@@ -142,7 +197,7 @@ func (s *Server) apiCreateStore(c *gin.Context) {
 	}
 	uid, _ := middleware.UserID(c)
 	var id int64
-	err := s.pool.QueryRow(c.Request.Context(),
+	err = s.pool.QueryRow(c.Request.Context(),
 		`INSERT INTO stores (user_id, name, subdomain, description) VALUES ($1, $2, $3, $4) RETURNING id`,
 		uid, name, sub, strings.TrimSpace(body.Description),
 	).Scan(&id)
@@ -566,42 +621,10 @@ func (s *Server) apiUpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	setName := body.Name != nil
-	nameVal := ""
-	if body.Name != nil {
-		nameVal = strings.TrimSpace(*body.Name)
-		if nameVal == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "product name is required"})
-			return
-		}
-	}
-	setDesc := body.Description != nil
-	descVal := ""
-	if body.Description != nil {
-		descVal = strings.TrimSpace(*body.Description)
-	}
-	setPrice := body.Price != nil
-	priceVal := 0.0
-	if body.Price != nil {
-		priceVal = *body.Price
-		if priceVal < 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "price must be greater than or equal to 0"})
-			return
-		}
-	}
-	setStock := body.Stock != nil
-	stockVal := 0
-	if body.Stock != nil {
-		stockVal = *body.Stock
-		if stockVal < 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "stock must be greater than or equal to 0"})
-			return
-		}
-	}
-	setImg := body.ImageURL != nil
-	imgVal := ""
-	if body.ImageURL != nil {
-		imgVal = strings.TrimSpace(*body.ImageURL)
+	update, err := normalizeProductUpdate(body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	cmd, err := s.pool.Exec(c.Request.Context(),
 		`UPDATE products SET
@@ -611,11 +634,11 @@ func (s *Server) apiUpdateProduct(c *gin.Context) {
 			stock = CASE WHEN $7 THEN $8::int ELSE stock END,
 			image_url = CASE WHEN $9 THEN NULLIF($10::text, '') ELSE image_url END
 		WHERE id = $11`,
-		setName, nameVal,
-		setDesc, descVal,
-		setPrice, priceVal,
-		setStock, stockVal,
-		setImg, imgVal,
+		update.SetName, update.Name,
+		update.SetDesc, update.Desc,
+		update.SetPrice, update.Price,
+		update.SetStock, update.Stock,
+		update.SetImage, update.ImageURL,
 		id,
 	)
 	if err != nil {
