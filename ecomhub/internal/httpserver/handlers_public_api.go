@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -25,14 +26,21 @@ type publicStoreResponse struct {
 	Theme models.StoreTheme `json:"theme"`
 }
 
+type publicStoreLoader func(context.Context, string) (models.Store, error)
+type publicThemeLoader func(context.Context, int64) (models.StoreTheme, error)
+
 func (s *Server) apiPublicStoreBySubdomain(c *gin.Context) {
+	apiPublicStoreBySubdomain(c, s.loadStoreBySubdomain, s.loadStoreThemeByID)
+}
+
+func apiPublicStoreBySubdomain(c *gin.Context, loadStore publicStoreLoader, loadTheme publicThemeLoader) {
 	sub := normalizeSubdomain(c.Param("subdomain"))
 	if !subdomainRe.MatchString(sub) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subdomain"})
 		return
 	}
 
-	store, err := s.loadStoreBySubdomain(c.Request.Context(), sub)
+	store, err := loadStore(c.Request.Context(), sub)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
 		return
@@ -42,7 +50,7 @@ func (s *Server) apiPublicStoreBySubdomain(c *gin.Context) {
 		return
 	}
 
-	theme, err := s.loadStoreThemeByID(c.Request.Context(), store.ID)
+	theme, err := loadTheme(c.Request.Context(), store.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "theme query failed"})
 		return
