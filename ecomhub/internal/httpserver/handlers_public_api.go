@@ -56,7 +56,7 @@ type publicPaginationDTO struct {
 	HasMore bool `json:"has_more"`
 }
 
-type publicPagination struct {
+type publicPaginationParams struct {
 	Limit  int
 	Offset int
 }
@@ -177,35 +177,35 @@ func apiPublicStoreProducts(c *gin.Context, loadStore publicStoreLoader, loadPro
 	})
 }
 
-func parsePublicPagination(c *gin.Context) (publicPagination, error) {
+func parsePublicPagination(c *gin.Context) (publicPaginationParams, error) {
 	limit := defaultPublicProductsLimit
 	if raw := c.Query("limit"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			return publicPagination{}, errors.New("invalid limit")
+			return publicPaginationParams{}, errors.New("invalid limit")
 		}
 		limit = parsed
 	}
 	if limit < 1 {
-		return publicPagination{}, errors.New("invalid limit")
+		return publicPaginationParams{}, errors.New("invalid limit")
 	}
 	if limit > maxPublicProductsLimit {
-		return publicPagination{}, errors.New("limit must be less than or equal to 50")
+		return publicPaginationParams{}, errors.New("limit must be less than or equal to 50")
 	}
 
 	offset := 0
 	if raw := c.Query("offset"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			return publicPagination{}, errors.New("invalid offset")
+			return publicPaginationParams{}, errors.New("invalid offset")
 		}
 		offset = parsed
 	}
 	if offset < 0 {
-		return publicPagination{}, errors.New("invalid offset")
+		return publicPaginationParams{}, errors.New("invalid offset")
 	}
 
-	return publicPagination{Limit: limit, Offset: offset}, nil
+	return publicPaginationParams{Limit: limit, Offset: offset}, nil
 }
 
 func (s *Server) loadPublicProductsByStoreID(ctx context.Context, storeID int64, limit int, offset int) ([]models.Product, error) {
