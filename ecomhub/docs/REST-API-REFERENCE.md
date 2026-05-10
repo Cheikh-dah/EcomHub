@@ -383,6 +383,62 @@ Errors:
 - `404 Not Found`: store does not exist or is not active.
 - `500 Internal Server Error`: database/theme read failure.
 
+### `GET /api/public/stores/:subdomain/products?limit=24&offset=0`
+
+Auth: none.
+
+Returns public products for an active store.
+
+Query parameters:
+
+- `limit`: optional positive integer, default `24`, max `50`.
+- `offset`: optional non-negative integer, default `0`.
+
+Invalid or out-of-range values return `400 Bad Request`.
+
+Response:
+
+```json
+{
+  "store": {
+    "id": 11,
+    "name": "My Store",
+    "subdomain": "my-store"
+  },
+  "products": [
+    {
+      "id": 100,
+      "name": "Perfume",
+      "description": "Nice scent",
+      "price": 19.99,
+      "stock": 5,
+      "image_url": "https://example.com/perfume.jpg",
+      "created_at": "2026-05-09T13:00:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 24,
+    "offset": 0,
+    "count": 1,
+    "has_more": false
+  }
+}
+```
+
+Notes:
+
+- `products` is an empty array when the store has no products.
+- `count` is the number of products returned in this page, after slicing the `limit + 1` fetch.
+- `has_more` is true when one additional row was fetched beyond the requested limit.
+- Product `store_id` is intentionally not exposed.
+- Merchant `user_id` is intentionally not exposed.
+
+Errors:
+
+- `400 Bad Request`: invalid subdomain format.
+- `404 Not Found`: store does not exist or is not active.
+- `500 Internal Server Error`: database read failure.
+
 ## Browser Console Example
 
 ```js
