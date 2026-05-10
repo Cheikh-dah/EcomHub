@@ -42,8 +42,16 @@ func performPublicStoreRequest(r http.Handler, subdomain string) *httptest.Respo
 }
 
 func performPublicStoreProductsRequest(r http.Handler, subdomain string) *httptest.ResponseRecorder {
+	return performPublicStoreProductsRequestWithQuery(r, subdomain, "")
+}
+
+func performPublicStoreProductsRequestWithQuery(r http.Handler, subdomain string, query string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/public/stores/"+subdomain+"/products", nil)
+	target := "/api/public/stores/" + subdomain + "/products"
+	if query != "" {
+		target += "?" + query
+	}
+	req := httptest.NewRequest(http.MethodGet, target, nil)
 	r.ServeHTTP(w, req)
 	return w
 }
@@ -148,7 +156,7 @@ func TestPublicStoreProductsInvalidSubdomain(t *testing.T) {
 			t.Fatal("store loader should not be called for invalid subdomain")
 			return models.Store{}, nil
 		},
-		func(context.Context, int64) ([]models.Product, error) {
+		func(context.Context, int64, int, int) ([]models.Product, error) {
 			t.Fatal("products loader should not be called for invalid subdomain")
 			return nil, nil
 		},
@@ -168,7 +176,7 @@ func TestPublicStoreProductsMissingOrInactiveStore(t *testing.T) {
 			}
 			return models.Store{}, pgx.ErrNoRows
 		},
-		func(context.Context, int64) ([]models.Product, error) {
+		func(context.Context, int64, int, int) ([]models.Product, error) {
 			t.Fatal("products loader should not be called when store is missing")
 			return nil, nil
 		},
@@ -188,9 +196,15 @@ func TestPublicStoreProductsActiveStoreEmptyList(t *testing.T) {
 			}
 			return models.Store{ID: 7, Name: "Empty Store", Subdomain: "empty-store", Status: "active"}, nil
 		},
-		func(_ context.Context, storeID int64) ([]models.Product, error) {
+		func(_ context.Context, storeID int64, limit int, offset int) ([]models.Product, error) {
 			if storeID != 7 {
 				t.Fatalf("expected store id 7, got %d", storeID)
+			}
+			if limit != defaultPublicProductsLimit+1 {
+				t.Fatalf("expected default limit+1 fetch, got %d", limit)
+			}
+			if offset != 0 {
+				t.Fatalf("expected default offset 0, got %d", offset)
 			}
 			return []models.Product{}, nil
 		},
@@ -214,6 +228,9 @@ func TestPublicStoreProductsActiveStoreEmptyList(t *testing.T) {
 	if len(got.Products) != 0 {
 		t.Fatalf("expected no products, got %#v", got.Products)
 	}
+	if got.Pagination.Limit != defaultPublicProductsLimit || got.Pagination.Offset != 0 || got.Pagination.Count != 0 || got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
 }
 
 func TestPublicStoreProductsActiveStoreWithProducts(t *testing.T) {
@@ -232,9 +249,15 @@ func TestPublicStoreProductsActiveStoreWithProducts(t *testing.T) {
 				Status:    "active",
 			}, nil
 		},
-		func(_ context.Context, storeID int64) ([]models.Product, error) {
+		func(_ context.Context, storeID int64, limit int, offset int) ([]models.Product, error) {
 			if storeID != 42 {
 				t.Fatalf("expected store id 42, got %d", storeID)
+			}
+			if limit != defaultPublicProductsLimit+1 {
+				t.Fatalf("expected default limit+1 fetch, got %d", limit)
+			}
+			if offset != 0 {
+				t.Fatalf("expected default offset 0, got %d", offset)
 			}
 			return []models.Product{
 				{
@@ -278,5 +301,88 @@ func TestPublicStoreProductsActiveStoreWithProducts(t *testing.T) {
 	}
 	if product.Description != "Nice scent" || product.ImageURL != "https://example.com/perfume.jpg" {
 		t.Fatalf("unexpected product detail payload: %#v", product)
+	}
+	if got.Pagination.Limit != defaultPublicProductsLimit || got.Pagination.Offset != 0 || got.Pagination.Count != 1 || got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicStoreProductsCustomPaginationAndHasMore(t *testing.T) {
+	createdAt := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	r := testPublicStoreProductsRouter(
+		func(_ context.Context, subdomain string) (models.Store, error) {
+			if subdomain != "my-store" {
+				t.Fatalf("expected normalized subdomain my-store, got %q", subdomain)
+			}
+			return models.Store{ID: 42, Name: "My Store", Subdomain: "my-store", Status: "active"}, nil
+		},
+		func(_ context.Context, storeID int64, limit int, offset int) ([]models.Product, error) {
+			if storeID != 42 {
+				t.Fatalf("expected store id 42, got %d", storeID)
+			}
+			if limit != 3 {
+				t.Fatalf("expected requested limit+1 fetch of 3, got %d", limit)
+			}
+			if offset != 4 {
+				t.Fatalf("expected offset 4, got %d", offset)
+			}
+			return []models.Product{
+				{ID: 3, Name: "Third", Price: 3, CreatedAt: createdAt},
+				{ID: 2, Name: "Second", Price: 2, CreatedAt: createdAt},
+				{ID: 1, Name: "Extra", Price: 1, CreatedAt: createdAt},
+			}, nil
+		},
+	)
+
+	w := performPublicStoreProductsRequestWithQuery(r, "My-Store", "limit=2&offset=4")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var got publicStoreProductsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if len(got.Products) != 2 {
+		t.Fatalf("expected returned products sliced to limit, got %#v", got.Products)
+	}
+	if got.Products[0].ID != 3 || got.Products[1].ID != 2 {
+		t.Fatalf("unexpected products after slicing: %#v", got.Products)
+	}
+	if got.Pagination.Limit != 2 || got.Pagination.Offset != 4 || got.Pagination.Count != 2 || !got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicStoreProductsRejectsInvalidPagination(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "non integer limit", query: "limit=abc"},
+		{name: "zero limit", query: "limit=0"},
+		{name: "limit too high", query: "limit=51"},
+		{name: "non integer offset", query: "offset=abc"},
+		{name: "negative offset", query: "offset=-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := testPublicStoreProductsRouter(
+				func(context.Context, string) (models.Store, error) {
+					t.Fatal("store loader should not be called for invalid pagination")
+					return models.Store{}, nil
+				},
+				func(context.Context, int64, int, int) ([]models.Product, error) {
+					t.Fatal("products loader should not be called for invalid pagination")
+					return nil, nil
+				},
+			)
+
+			w := performPublicStoreProductsRequestWithQuery(r, "my-store", tt.query)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
 	}
 }
