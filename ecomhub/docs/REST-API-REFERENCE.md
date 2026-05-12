@@ -439,6 +439,46 @@ Errors:
 - `404 Not Found`: store does not exist or is not active.
 - `500 Internal Server Error`: database read failure.
 
+### `GET /api/public/stores/:subdomain/products/:id`
+
+Auth: none.
+
+Returns one public product for an active store.
+
+Response:
+
+```json
+{
+  "store": {
+    "id": 11,
+    "name": "My Store",
+    "subdomain": "my-store"
+  },
+  "product": {
+    "id": 100,
+    "name": "Perfume",
+    "description": "Nice scent",
+    "price": 19.99,
+    "stock": 5,
+    "image_url": "https://example.com/perfume.jpg",
+    "created_at": "2026-05-09T13:00:00Z"
+  }
+}
+```
+
+Notes:
+
+- Product shape matches the public product list item shape.
+- Product lookup is scoped to the active store from `:subdomain`.
+- Product `store_id` is intentionally not exposed.
+- Merchant `user_id` is intentionally not exposed.
+
+Errors:
+
+- `400 Bad Request`: invalid subdomain format or invalid product ID.
+- `404 Not Found`: store does not exist, store is inactive, product does not exist, or product is not in that store.
+- `500 Internal Server Error`: database read failure.
+
 ## Browser Console Example
 
 ```js

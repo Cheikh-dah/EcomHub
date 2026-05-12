@@ -42,6 +42,7 @@ func (s *Server) Mount(r *gin.Engine) {
 		api.POST("/logout", s.apiLogout)
 		api.GET("/public/stores/:subdomain", s.apiPublicStoreBySubdomain)
 		api.GET("/public/stores/:subdomain/products", s.apiPublicStoreProducts)
+		api.GET("/public/stores/:subdomain/products/:id", s.apiPublicStoreProduct)
 
 		authd := api.Group("")
 		authd.Use(middleware.RequireAuth(s.pool, s.cfg.ClerkAuthorizedParties))
