@@ -49,6 +49,11 @@ type publicStoreProductsResponse struct {
 	Pagination publicPaginationDTO   `json:"pagination"`
 }
 
+type publicStoreProductResponse struct {
+	Store   publicStoreSummaryDTO `json:"store"`
+	Product publicProductDTO      `json:"product"`
+}
+
 type publicPaginationDTO struct {
 	Limit   int  `json:"limit"`
 	Offset  int  `json:"offset"`
@@ -64,6 +69,7 @@ type publicPaginationParams struct {
 type publicStoreLoader func(context.Context, string) (models.Store, error)
 type publicThemeLoader func(context.Context, int64) (models.StoreTheme, error)
 type publicProductsLoader func(context.Context, int64, int, int) ([]models.Product, error)
+type publicProductLoader func(context.Context, int64, int64) (models.Product, error)
 
 const (
 	defaultPublicProductsLimit = 24
@@ -150,15 +156,7 @@ func apiPublicStoreProducts(c *gin.Context, loadStore publicStoreLoader, loadPro
 
 	out := make([]publicProductDTO, 0, len(products))
 	for _, product := range products {
-		out = append(out, publicProductDTO{
-			ID:          product.ID,
-			Name:        product.Name,
-			Description: product.Description,
-			Price:       product.Price,
-			Stock:       product.Stock,
-			ImageURL:    product.ImageURL,
-			CreatedAt:   product.CreatedAt,
-		})
+		out = append(out, publicProductToDTO(product))
 	}
 
 	c.JSON(http.StatusOK, publicStoreProductsResponse{
@@ -175,6 +173,65 @@ func apiPublicStoreProducts(c *gin.Context, loadStore publicStoreLoader, loadPro
 			HasMore: hasMore,
 		},
 	})
+}
+
+func (s *Server) apiPublicStoreProduct(c *gin.Context) {
+	apiPublicStoreProduct(c, s.loadStoreBySubdomain, s.loadPublicProductByStoreID)
+}
+
+func apiPublicStoreProduct(c *gin.Context, loadStore publicStoreLoader, loadProduct publicProductLoader) {
+	sub := normalizeSubdomain(c.Param("subdomain"))
+	if !subdomainRe.MatchString(sub) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subdomain"})
+		return
+	}
+
+	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || productID < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
+		return
+	}
+
+	store, err := loadStore(c.Request.Context(), sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "query failed"})
+		return
+	}
+
+	product, err := loadProduct(c.Request.Context(), store.ID, productID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "product query failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, publicStoreProductResponse{
+		Store: publicStoreSummaryDTO{
+			ID:        store.ID,
+			Name:      store.Name,
+			Subdomain: store.Subdomain,
+		},
+		Product: publicProductToDTO(product),
+	})
+}
+
+func publicProductToDTO(product models.Product) publicProductDTO {
+	return publicProductDTO{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		ImageURL:    product.ImageURL,
+		CreatedAt:   product.CreatedAt,
+	}
 }
 
 func parsePublicPagination(c *gin.Context) (publicPaginationParams, error) {
@@ -243,4 +300,24 @@ func (s *Server) loadPublicProductsByStoreID(ctx context.Context, storeID int64,
 		return nil, err
 	}
 	return products, nil
+}
+
+func (s *Server) loadPublicProductByStoreID(ctx context.Context, storeID int64, productID int64) (models.Product, error) {
+	var product models.Product
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at
+		 FROM products
+		 WHERE id = $1 AND store_id = $2`,
+		productID, storeID,
+	).Scan(
+		&product.ID,
+		&product.StoreID,
+		&product.Name,
+		&product.Description,
+		&product.Price,
+		&product.Stock,
+		&product.ImageURL,
+		&product.CreatedAt,
+	)
+	return product, err
 }

@@ -34,6 +34,15 @@ func testPublicStoreProductsRouter(loadStore publicStoreLoader, loadProducts pub
 	return r
 }
 
+func testPublicStoreProductRouter(loadStore publicStoreLoader, loadProduct publicProductLoader) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/api/public/stores/:subdomain/products/:id", func(c *gin.Context) {
+		apiPublicStoreProduct(c, loadStore, loadProduct)
+	})
+	return r
+}
+
 func performPublicStoreRequest(r http.Handler, subdomain string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/public/stores/"+subdomain, nil)
@@ -56,6 +65,13 @@ func performPublicStoreProductsRequestWithQuery(r http.Handler, subdomain string
 	return w
 }
 
+func performPublicStoreProductRequest(r http.Handler, subdomain string, productID string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/public/stores/"+subdomain+"/products/"+productID, nil)
+	r.ServeHTTP(w, req)
+	return w
+}
+
 func TestPublicStoreBySubdomainInvalidSubdomain(t *testing.T) {
 	r := testPublicStoreRouter(
 		func(context.Context, string) (models.Store, error) {
@@ -71,6 +87,162 @@ func TestPublicStoreBySubdomainInvalidSubdomain(t *testing.T) {
 	w := performPublicStoreRequest(r, "-bad")
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicStoreProductInvalidSubdomain(t *testing.T) {
+	r := testPublicStoreProductRouter(
+		func(context.Context, string) (models.Store, error) {
+			t.Fatal("store loader should not be called for invalid subdomain")
+			return models.Store{}, nil
+		},
+		func(context.Context, int64, int64) (models.Product, error) {
+			t.Fatal("product loader should not be called for invalid subdomain")
+			return models.Product{}, nil
+		},
+	)
+
+	w := performPublicStoreProductRequest(r, "-bad", "100")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicStoreProductInvalidProductID(t *testing.T) {
+	tests := []struct {
+		name      string
+		productID string
+	}{
+		{name: "non integer", productID: "abc"},
+		{name: "zero", productID: "0"},
+		{name: "negative", productID: "-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := testPublicStoreProductRouter(
+				func(context.Context, string) (models.Store, error) {
+					t.Fatal("store loader should not be called for invalid product id")
+					return models.Store{}, nil
+				},
+				func(context.Context, int64, int64) (models.Product, error) {
+					t.Fatal("product loader should not be called for invalid product id")
+					return models.Product{}, nil
+				},
+			)
+
+			w := performPublicStoreProductRequest(r, "my-store", tt.productID)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestPublicStoreProductMissingOrInactiveStore(t *testing.T) {
+	r := testPublicStoreProductRouter(
+		func(_ context.Context, subdomain string) (models.Store, error) {
+			if subdomain != "missing" {
+				t.Fatalf("expected normalized subdomain missing, got %q", subdomain)
+			}
+			return models.Store{}, pgx.ErrNoRows
+		},
+		func(context.Context, int64, int64) (models.Product, error) {
+			t.Fatal("product loader should not be called when store is missing")
+			return models.Product{}, nil
+		},
+	)
+
+	w := performPublicStoreProductRequest(r, "missing", "100")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicStoreProductNotFoundInStore(t *testing.T) {
+	r := testPublicStoreProductRouter(
+		func(_ context.Context, subdomain string) (models.Store, error) {
+			if subdomain != "my-store" {
+				t.Fatalf("expected normalized subdomain my-store, got %q", subdomain)
+			}
+			return models.Store{ID: 42, Name: "My Store", Subdomain: "my-store", Status: "active"}, nil
+		},
+		func(_ context.Context, storeID int64, productID int64) (models.Product, error) {
+			if storeID != 42 {
+				t.Fatalf("expected store id 42, got %d", storeID)
+			}
+			if productID != 999 {
+				t.Fatalf("expected product id 999, got %d", productID)
+			}
+			return models.Product{}, pgx.ErrNoRows
+		},
+	)
+
+	w := performPublicStoreProductRequest(r, "My-Store", "999")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicStoreProductActiveStoreWithProduct(t *testing.T) {
+	createdAt := time.Date(2026, 5, 12, 10, 0, 0, 0, time.UTC)
+	storeUserID := uuid.New()
+	r := testPublicStoreProductRouter(
+		func(_ context.Context, subdomain string) (models.Store, error) {
+			if subdomain != "my-store" {
+				t.Fatalf("expected normalized subdomain my-store, got %q", subdomain)
+			}
+			return models.Store{
+				ID:        42,
+				UserID:    storeUserID,
+				Name:      "My Store",
+				Subdomain: "my-store",
+				Status:    "active",
+			}, nil
+		},
+		func(_ context.Context, storeID int64, productID int64) (models.Product, error) {
+			if storeID != 42 {
+				t.Fatalf("expected store id 42, got %d", storeID)
+			}
+			if productID != 100 {
+				t.Fatalf("expected product id 100, got %d", productID)
+			}
+			return models.Product{
+				ID:          100,
+				StoreID:     42,
+				Name:        "Perfume",
+				Description: "Nice scent",
+				Price:       19.99,
+				Stock:       5,
+				ImageURL:    "https://example.com/perfume.jpg",
+				CreatedAt:   createdAt,
+			}, nil
+		},
+	)
+
+	w := performPublicStoreProductRequest(r, "My-Store", "100")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "user_id") || strings.Contains(w.Body.String(), storeUserID.String()) {
+		t.Fatalf("response leaked user identity: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "store_id") {
+		t.Fatalf("response leaked product store_id: %s", w.Body.String())
+	}
+
+	var got publicStoreProductResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if got.Store.ID != 42 || got.Store.Name != "My Store" || got.Store.Subdomain != "my-store" {
+		t.Fatalf("unexpected store summary: %#v", got.Store)
+	}
+	if got.Product.ID != 100 || got.Product.Name != "Perfume" || got.Product.Price != 19.99 || got.Product.Stock != 5 {
+		t.Fatalf("unexpected product payload: %#v", got.Product)
+	}
+	if got.Product.Description != "Nice scent" || got.Product.ImageURL != "https://example.com/perfume.jpg" {
+		t.Fatalf("unexpected product detail payload: %#v", got.Product)
 	}
 }
 
