@@ -25,6 +25,24 @@ func testPublicStoreRouter(loadStore publicStoreLoader, loadTheme publicThemeLoa
 	return r
 }
 
+func testPublicHubProductsRouter(loadProducts publicHubProductsLoader) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/api/public/hub/products", func(c *gin.Context) {
+		apiPublicHubProducts(c, loadProducts)
+	})
+	return r
+}
+
+func testPublicHubStoresRouter(loadStores publicHubStoresLoader) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/api/public/hub/stores", func(c *gin.Context) {
+		apiPublicHubStores(c, loadStores)
+	})
+	return r
+}
+
 func testPublicStoreProductsRouter(loadStore publicStoreLoader, loadProducts publicProductsLoader) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -70,6 +88,259 @@ func performPublicStoreProductRequest(r http.Handler, subdomain string, productI
 	req := httptest.NewRequest(http.MethodGet, "/api/public/stores/"+subdomain+"/products/"+productID, nil)
 	r.ServeHTTP(w, req)
 	return w
+}
+
+func performPublicHubRequest(r http.Handler, path string, query string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	target := path
+	if query != "" {
+		target += "?" + query
+	}
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestPublicHubProductsEmptyList(t *testing.T) {
+	r := testPublicHubProductsRouter(
+		func(_ context.Context, limit int, offset int, search string) ([]publicHubProductRow, error) {
+			if limit != defaultPublicProductsLimit+1 {
+				t.Fatalf("expected default limit+1 fetch, got %d", limit)
+			}
+			if offset != 0 {
+				t.Fatalf("expected default offset 0, got %d", offset)
+			}
+			if search != "" {
+				t.Fatalf("expected empty search, got %q", search)
+			}
+			return []publicHubProductRow{}, nil
+		},
+	)
+
+	w := performPublicHubRequest(r, "/api/public/hub/products", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var got publicHubProductsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if got.Products == nil {
+		t.Fatal("expected products to be an empty JSON array, got nil")
+	}
+	if len(got.Products) != 0 {
+		t.Fatalf("expected no products, got %#v", got.Products)
+	}
+	if got.Pagination.Limit != defaultPublicProductsLimit || got.Pagination.Offset != 0 || got.Pagination.Count != 0 || got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicHubProductsCustomPaginationSearchAndHasMore(t *testing.T) {
+	createdAt := time.Date(2026, 5, 13, 9, 0, 0, 0, time.UTC)
+	storeUserID := uuid.New()
+	r := testPublicHubProductsRouter(
+		func(_ context.Context, limit int, offset int, search string) ([]publicHubProductRow, error) {
+			if limit != 3 {
+				t.Fatalf("expected requested limit+1 fetch of 3, got %d", limit)
+			}
+			if offset != 4 {
+				t.Fatalf("expected offset 4, got %d", offset)
+			}
+			if search != "perfume" {
+				t.Fatalf("expected trimmed search perfume, got %q", search)
+			}
+			return []publicHubProductRow{
+				{
+					Product: models.Product{ID: 3, StoreID: 42, Name: "Third", Price: 3, Stock: 8, ImageURL: "https://example.com/third.jpg", CreatedAt: createdAt},
+					Store:   models.Store{ID: 42, UserID: storeUserID, Name: "Scent Store", Subdomain: "scent-store", Status: "active", CreatedAt: createdAt},
+				},
+				{
+					Product: models.Product{ID: 2, StoreID: 43, Name: "Second", Price: 2, Stock: 4, CreatedAt: createdAt},
+					Store:   models.Store{ID: 43, UserID: uuid.New(), Name: "Another Store", Subdomain: "another-store", Status: "active", CreatedAt: createdAt},
+				},
+				{
+					Product: models.Product{ID: 1, StoreID: 44, Name: "Extra", Price: 1, CreatedAt: createdAt},
+					Store:   models.Store{ID: 44, UserID: uuid.New(), Name: "Extra Store", Subdomain: "extra-store", Status: "active", CreatedAt: createdAt},
+				},
+			}, nil
+		},
+	)
+
+	w := performPublicHubRequest(r, "/api/public/hub/products", "limit=2&offset=4&search=%20perfume%20")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "user_id") || strings.Contains(w.Body.String(), storeUserID.String()) {
+		t.Fatalf("response leaked user identity: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "store_id") {
+		t.Fatalf("response leaked product store_id: %s", w.Body.String())
+	}
+
+	var got publicHubProductsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if len(got.Products) != 2 {
+		t.Fatalf("expected returned products sliced to limit, got %#v", got.Products)
+	}
+	if got.Products[0].ID != 3 || got.Products[0].Name != "Third" || got.Products[0].Store.Subdomain != "scent-store" {
+		t.Fatalf("unexpected first product payload: %#v", got.Products[0])
+	}
+	if got.Products[1].ID != 2 || got.Products[1].Store.Name != "Another Store" {
+		t.Fatalf("unexpected second product payload: %#v", got.Products[1])
+	}
+	if got.Pagination.Limit != 2 || got.Pagination.Offset != 4 || got.Pagination.Count != 2 || !got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicHubProductsRejectsInvalidQuery(t *testing.T) {
+	longSearch := strings.Repeat("a", maxPublicSearchLength+1)
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "non integer limit", query: "limit=abc"},
+		{name: "zero limit", query: "limit=0"},
+		{name: "limit too high", query: "limit=51"},
+		{name: "non integer offset", query: "offset=abc"},
+		{name: "negative offset", query: "offset=-1"},
+		{name: "search too long", query: "search=" + longSearch},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := testPublicHubProductsRouter(
+				func(context.Context, int, int, string) ([]publicHubProductRow, error) {
+					t.Fatal("products loader should not be called for invalid query")
+					return nil, nil
+				},
+			)
+
+			w := performPublicHubRequest(r, "/api/public/hub/products", tt.query)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestPublicHubStoresEmptyList(t *testing.T) {
+	r := testPublicHubStoresRouter(
+		func(_ context.Context, limit int, offset int, search string) ([]models.Store, error) {
+			if limit != defaultPublicProductsLimit+1 {
+				t.Fatalf("expected default limit+1 fetch, got %d", limit)
+			}
+			if offset != 0 {
+				t.Fatalf("expected default offset 0, got %d", offset)
+			}
+			if search != "" {
+				t.Fatalf("expected empty search, got %q", search)
+			}
+			return []models.Store{}, nil
+		},
+	)
+
+	w := performPublicHubRequest(r, "/api/public/hub/stores", "search=%20%20")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var got publicHubStoresResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if got.Stores == nil {
+		t.Fatal("expected stores to be an empty JSON array, got nil")
+	}
+	if len(got.Stores) != 0 {
+		t.Fatalf("expected no stores, got %#v", got.Stores)
+	}
+	if got.Pagination.Limit != defaultPublicProductsLimit || got.Pagination.Offset != 0 || got.Pagination.Count != 0 || got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicHubStoresCustomPaginationSearchAndHasMore(t *testing.T) {
+	createdAt := time.Date(2026, 5, 13, 10, 0, 0, 0, time.UTC)
+	firstUserID := uuid.New()
+	r := testPublicHubStoresRouter(
+		func(_ context.Context, limit int, offset int, search string) ([]models.Store, error) {
+			if limit != 3 {
+				t.Fatalf("expected requested limit+1 fetch of 3, got %d", limit)
+			}
+			if offset != 6 {
+				t.Fatalf("expected offset 6, got %d", offset)
+			}
+			if search != "market" {
+				t.Fatalf("expected trimmed search market, got %q", search)
+			}
+			return []models.Store{
+				{ID: 30, UserID: firstUserID, Name: "Market One", Subdomain: "market-one", Description: "First", Status: "active", CreatedAt: createdAt},
+				{ID: 29, UserID: uuid.New(), Name: "Market Two", Subdomain: "market-two", Description: "Second", Status: "active", CreatedAt: createdAt},
+				{ID: 28, UserID: uuid.New(), Name: "Extra", Subdomain: "extra", Status: "active", CreatedAt: createdAt},
+			}, nil
+		},
+	)
+
+	w := performPublicHubRequest(r, "/api/public/hub/stores", "limit=2&offset=6&search=%20market%20")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "user_id") || strings.Contains(w.Body.String(), firstUserID.String()) {
+		t.Fatalf("response leaked user identity: %s", w.Body.String())
+	}
+
+	var got publicHubStoresResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if len(got.Stores) != 2 {
+		t.Fatalf("expected returned stores sliced to limit, got %#v", got.Stores)
+	}
+	if got.Stores[0].ID != 30 || got.Stores[0].Name != "Market One" || got.Stores[0].Subdomain != "market-one" {
+		t.Fatalf("unexpected first store payload: %#v", got.Stores[0])
+	}
+	if got.Stores[1].ID != 29 || got.Stores[1].Name != "Market Two" {
+		t.Fatalf("unexpected second store payload: %#v", got.Stores[1])
+	}
+	if got.Pagination.Limit != 2 || got.Pagination.Offset != 6 || got.Pagination.Count != 2 || !got.Pagination.HasMore {
+		t.Fatalf("unexpected pagination: %#v", got.Pagination)
+	}
+}
+
+func TestPublicHubStoresRejectsInvalidQuery(t *testing.T) {
+	longSearch := strings.Repeat("a", maxPublicSearchLength+1)
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "non integer limit", query: "limit=abc"},
+		{name: "zero limit", query: "limit=0"},
+		{name: "limit too high", query: "limit=51"},
+		{name: "non integer offset", query: "offset=abc"},
+		{name: "negative offset", query: "offset=-1"},
+		{name: "search too long", query: "search=" + longSearch},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := testPublicHubStoresRouter(
+				func(context.Context, int, int, string) ([]models.Store, error) {
+					t.Fatal("stores loader should not be called for invalid query")
+					return nil, nil
+				},
+			)
+
+			w := performPublicHubRequest(r, "/api/public/hub/stores", tt.query)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
 }
 
 func TestPublicStoreBySubdomainInvalidSubdomain(t *testing.T) {
