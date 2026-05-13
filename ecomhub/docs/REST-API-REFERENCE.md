@@ -330,8 +330,8 @@ These are the recommended API boundary for the future Next.js storefront:
 GET /api/public/stores/:subdomain
 GET /api/public/stores/:subdomain/products
 GET /api/public/stores/:subdomain/products/:id
-GET /api/public/hub/products
-GET /api/public/hub/stores
+GET /api/public/hub/products?limit=24&offset=0&search=
+GET /api/public/hub/stores?limit=24&offset=0&search=
 GET /api/public/search?q=<term>
 ```
 
@@ -477,6 +477,112 @@ Errors:
 
 - `400 Bad Request`: invalid subdomain format or invalid product ID.
 - `404 Not Found`: store does not exist, store is inactive, product does not exist, or product is not in that store.
+- `500 Internal Server Error`: database read failure.
+
+### `GET /api/public/hub/products?limit=24&offset=0&search=`
+
+Auth: none.
+
+Returns public products across active stores for hub discovery.
+
+Query parameters:
+
+- `limit`: optional positive integer, default `24`, max `50`.
+- `offset`: optional non-negative integer, default `0`.
+- `search`: optional text filter, max `100` characters. Empty or whitespace-only search applies no filter.
+
+Invalid or out-of-range values return `400 Bad Request`.
+
+Response:
+
+```json
+{
+  "products": [
+    {
+      "id": 100,
+      "name": "Perfume",
+      "description": "Nice scent",
+      "price": 19.99,
+      "stock": 5,
+      "image_url": "https://example.com/perfume.jpg",
+      "created_at": "2026-05-09T13:00:00Z",
+      "store": {
+        "id": 11,
+        "name": "My Store",
+        "subdomain": "my-store"
+      }
+    }
+  ],
+  "pagination": {
+    "limit": 24,
+    "offset": 0,
+    "count": 1,
+    "has_more": false
+  }
+}
+```
+
+Notes:
+
+- `products` is an empty array when there are no matching active-store products.
+- Product fields match the public storefront product shape, plus `store` attribution.
+- Results are ordered by `products.id DESC`.
+- Products from inactive stores are intentionally excluded.
+- Product `store_id` is intentionally not exposed.
+- Merchant `user_id` is intentionally not exposed.
+
+Errors:
+
+- `400 Bad Request`: invalid pagination or search parameters.
+- `500 Internal Server Error`: database read failure.
+
+### `GET /api/public/hub/stores?limit=24&offset=0&search=`
+
+Auth: none.
+
+Returns active stores for hub discovery.
+
+Query parameters:
+
+- `limit`: optional positive integer, default `24`, max `50`.
+- `offset`: optional non-negative integer, default `0`.
+- `search`: optional text filter, max `100` characters. Empty or whitespace-only search applies no filter.
+
+Invalid or out-of-range values return `400 Bad Request`.
+
+Response:
+
+```json
+{
+  "stores": [
+    {
+      "id": 11,
+      "name": "My Store",
+      "subdomain": "my-store",
+      "description": "Optional",
+      "status": "active",
+      "created_at": "2026-04-25T09:00:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 24,
+    "offset": 0,
+    "count": 1,
+    "has_more": false
+  }
+}
+```
+
+Notes:
+
+- `stores` is an empty array when there are no matching active stores.
+- Results are ordered by `stores.id DESC`.
+- Inactive stores are intentionally excluded.
+- Merchant `user_id` is intentionally not exposed.
+
+Errors:
+
+- `400 Bad Request`: invalid pagination or search parameters.
 - `500 Internal Server Error`: database read failure.
 
 ## Browser Console Example

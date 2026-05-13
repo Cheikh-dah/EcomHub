@@ -40,6 +40,8 @@ func (s *Server) Mount(r *gin.Engine) {
 	api := r.Group("/api")
 	{
 		api.POST("/logout", s.apiLogout)
+		api.GET("/public/hub/products", s.apiPublicHubProducts)
+		api.GET("/public/hub/stores", s.apiPublicHubStores)
 		api.GET("/public/stores/:subdomain", s.apiPublicStoreBySubdomain)
 		api.GET("/public/stores/:subdomain/products", s.apiPublicStoreProducts)
 		api.GET("/public/stores/:subdomain/products/:id", s.apiPublicStoreProduct)
