@@ -695,7 +695,11 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 	desc := strings.TrimSpace(c.PostForm("description"))
 	priceStr := c.PostForm("price")
 	stockStr := c.PostForm("stock")
-	img := strings.TrimSpace(c.PostForm("image_url"))
+	img, err := normalizeProductImageURL(c.PostForm("image_url"))
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_image_url")
+		return
+	}
 
 	var storeID int
 	if err := s.pool.QueryRow(c.Request.Context(), "SELECT id FROM stores WHERE id = $1 AND user_id = $2", storeIDStr, uid).Scan(&storeID); err != nil {
@@ -713,7 +717,7 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 		stock = st
 	}
 
-	_, err := s.pool.Exec(c.Request.Context(),
+	_, err = s.pool.Exec(c.Request.Context(),
 		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, $6)`,
 		storeID, name, desc, price, stock, img,
 	)

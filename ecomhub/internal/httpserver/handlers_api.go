@@ -22,6 +22,8 @@ import (
 var subdomainRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 var hexColorRe = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
+const maxProductImageURLLength = 2048
+
 type storeBody struct {
 	Name        string `json:"name" binding:"required"`
 	Subdomain   string `json:"subdomain" binding:"required"`
@@ -136,9 +138,31 @@ func normalizeProductUpdate(body productUpdateBody) (productUpdateValues, error)
 	}
 	if body.ImageURL != nil {
 		out.SetImage = true
-		out.ImageURL = strings.TrimSpace(*body.ImageURL)
+		imageURL, err := normalizeProductImageURL(*body.ImageURL)
+		if err != nil {
+			return out, err
+		}
+		out.ImageURL = imageURL
 	}
 	return out, nil
+}
+
+func normalizeProductImageURL(v string) (string, error) {
+	s := strings.TrimSpace(v)
+	if s == "" {
+		return "", nil
+	}
+	if len(s) > maxProductImageURLLength {
+		return "", errors.New("image_url is too long")
+	}
+	u, err := neturl.Parse(s)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", errors.New("invalid image_url")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", errors.New("invalid image_url")
+	}
+	return s, nil
 }
 
 func (s *Server) apiLogout(c *gin.Context) {
@@ -581,10 +605,15 @@ func (s *Server) apiCreateProduct(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
+	imageURL, err := normalizeProductImageURL(body.ImageURL)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	var id int64
-	err := s.pool.QueryRow(c.Request.Context(),
+	err = s.pool.QueryRow(c.Request.Context(),
 		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, NULLIF($6,'')) RETURNING id`,
-		body.StoreID, strings.TrimSpace(body.Name), strings.TrimSpace(body.Description), body.Price, body.Stock, strings.TrimSpace(body.ImageURL),
+		body.StoreID, strings.TrimSpace(body.Name), strings.TrimSpace(body.Description), body.Price, body.Stock, imageURL,
 	).Scan(&id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create failed"})

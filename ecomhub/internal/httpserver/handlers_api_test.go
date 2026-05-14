@@ -1,6 +1,9 @@
 package httpserver
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func strPtr(v string) *string {
 	return &v
@@ -31,11 +34,66 @@ func TestNormalizeProductUpdateRejectsInvalidValues(t *testing.T) {
 			name: "negative stock",
 			body: productUpdateBody{Stock: intPtr(-1)},
 		},
+		{
+			name: "invalid image url",
+			body: productUpdateBody{ImageURL: strPtr("data:image/png;base64,abc")},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if _, err := normalizeProductUpdate(tt.body); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestNormalizeProductImageURL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "whitespace", in: "   ", want: ""},
+		{name: "http", in: "http://example.com/image.jpg", want: "http://example.com/image.jpg"},
+		{name: "https", in: "https://example.com/image.jpg", want: "https://example.com/image.jpg"},
+		{name: "trims", in: "  https://example.com/image.jpg  ", want: "https://example.com/image.jpg"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeProductImageURL(tt.in)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestNormalizeProductImageURLRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+	}{
+		{name: "data image", in: "data:image/png;base64,abc"},
+		{name: "data", in: "data:text/plain,abc"},
+		{name: "javascript", in: "javascript:alert(1)"},
+		{name: "file", in: "file:///C:/tmp/image.jpg"},
+		{name: "blob", in: "blob:https://example.com/id"},
+		{name: "ftp", in: "ftp://example.com/image.jpg"},
+		{name: "relative", in: "/image.jpg"},
+		{name: "hostless", in: "https:///image.jpg"},
+		{name: "too long", in: "https://example.com/" + strings.Repeat("a", maxProductImageURLLength)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := normalizeProductImageURL(tt.in); err == nil {
 				t.Fatal("expected validation error")
 			}
 		})
