@@ -161,7 +161,7 @@ func (s *Server) hubSearchHTML(c *gin.Context) {
 func (s *Server) loadStoreBySubdomain(ctx context.Context, sub string) (models.Store, error) {
 	var st models.Store
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, user_id, name, subdomain, description, status, created_at FROM stores WHERE subdomain = $1 AND status = 'active'`,
+		`SELECT id, user_id, name, subdomain, COALESCE(description,''), status, created_at FROM stores WHERE subdomain = $1 AND status = 'active'`,
 		sub,
 	).Scan(&st.ID, &st.UserID, &st.Name, &st.Subdomain, &st.Description, &st.Status, &st.CreatedAt)
 	return st, err

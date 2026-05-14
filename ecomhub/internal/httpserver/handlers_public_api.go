@@ -392,7 +392,7 @@ func parsePublicPagination(c *gin.Context) (publicPaginationParams, error) {
 
 func (s *Server) loadPublicProductsByStoreID(ctx context.Context, storeID int64, limit int, offset int) ([]models.Product, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at
+		`SELECT id, store_id, name, COALESCE(description,''), price::float8, stock, COALESCE(image_url,''), created_at
 		 FROM products
 		 WHERE store_id = $1
 		 ORDER BY id DESC
@@ -430,7 +430,7 @@ func (s *Server) loadPublicProductsByStoreID(ctx context.Context, storeID int64,
 func (s *Server) loadPublicProductByStoreID(ctx context.Context, storeID int64, productID int64) (models.Product, error) {
 	var product models.Product
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, store_id, name, description, price::float8, stock, COALESCE(image_url,''), created_at
+		`SELECT id, store_id, name, COALESCE(description,''), price::float8, stock, COALESCE(image_url,''), created_at
 		 FROM products
 		 WHERE id = $1 AND store_id = $2`,
 		productID, storeID,
@@ -456,8 +456,8 @@ func (s *Server) loadPublicHubProducts(ctx context.Context, limit int, offset in
 	}
 
 	rows, err := s.pool.Query(ctx,
-		`SELECT products.id, products.store_id, products.name, products.description, products.price::float8, products.stock, COALESCE(products.image_url,''), products.created_at,
-		        stores.id, stores.user_id, stores.name, stores.subdomain, stores.description, stores.status, stores.created_at
+		`SELECT products.id, products.store_id, products.name, COALESCE(products.description,''), products.price::float8, products.stock, COALESCE(products.image_url,''), products.created_at,
+		        stores.id, stores.user_id, stores.name, stores.subdomain, COALESCE(stores.description,''), stores.status, stores.created_at
 		 FROM products
 		 JOIN stores ON stores.id = products.store_id
 		 `+where+`
@@ -509,7 +509,7 @@ func (s *Server) loadPublicHubStores(ctx context.Context, limit int, offset int,
 	}
 
 	rows, err := s.pool.Query(ctx,
-		`SELECT stores.id, stores.user_id, stores.name, stores.subdomain, stores.description, stores.status, stores.created_at
+		`SELECT stores.id, stores.user_id, stores.name, stores.subdomain, COALESCE(stores.description,''), stores.status, stores.created_at
 		 FROM stores
 		 `+where+`
 		 ORDER BY stores.id DESC
