@@ -101,6 +101,41 @@ func performPublicHubRequest(r http.Handler, path string, query string) *httptes
 	return w
 }
 
+func TestPublicProductToDTONormalizesImageURL(t *testing.T) {
+	product := publicProductToDTO(models.Product{
+		ID:       1,
+		Name:     "Product",
+		ImageURL: "  https://example.com/product.jpg  ",
+	})
+	if product.ImageURL != "https://example.com/product.jpg" {
+		t.Fatalf("expected trimmed image URL, got %q", product.ImageURL)
+	}
+}
+
+func TestPublicProductToDTOOmitsInvalidLegacyImageURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		imageURL string
+	}{
+		{name: "data image", imageURL: "data:image/png;base64,abc"},
+		{name: "too long", imageURL: "https://example.com/" + strings.Repeat("a", maxProductImageURLLength)},
+		{name: "javascript", imageURL: "javascript:alert(1)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			product := publicProductToDTO(models.Product{
+				ID:       1,
+				Name:     "Product",
+				ImageURL: tt.imageURL,
+			})
+			if product.ImageURL != "" {
+				t.Fatalf("expected invalid image URL to be omitted, got %q", product.ImageURL)
+			}
+		})
+	}
+}
+
 func TestPublicHubProductsEmptyList(t *testing.T) {
 	r := testPublicHubProductsRouter(
 		func(_ context.Context, limit int, offset int, search string) ([]publicHubProductRow, error) {
