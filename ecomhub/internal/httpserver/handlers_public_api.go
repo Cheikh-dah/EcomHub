@@ -321,13 +321,17 @@ func apiPublicStoreProduct(c *gin.Context, loadStore publicStoreLoader, loadProd
 }
 
 func publicProductToDTO(product models.Product) publicProductDTO {
+	imageURL, err := normalizeProductImageURL(product.ImageURL)
+	if err != nil {
+		imageURL = ""
+	}
 	return publicProductDTO{
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
 		Price:       product.Price,
 		Stock:       product.Stock,
-		ImageURL:    product.ImageURL,
+		ImageURL:    imageURL,
 		CreatedAt:   product.CreatedAt,
 	}
 }
