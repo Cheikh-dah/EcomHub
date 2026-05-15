@@ -655,6 +655,20 @@ func (s *Server) dashboardProductsGet(c *gin.Context) {
 		ActiveNav:          "products",
 		Title:              "Products",
 	}
+	switch strings.TrimSpace(c.Query("err")) {
+	case "invalid_image_url":
+		data.Error = "Product image URL must be empty or start with http:// or https://."
+	case "invalid_store":
+		data.Error = "Select one of your stores before adding a product."
+	case "create_failed":
+		data.Error = "Product could not be created. Check the product details and try again."
+	case "invalid_product":
+		data.Error = "Invalid product."
+	case "not_found":
+		data.Error = "Product not found."
+	case "delete_failed":
+		data.Error = "Product could not be deleted. Try again."
+	}
 
 	// Fetch stores for the store selector
 	rows, err := s.pool.Query(c.Request.Context(), `SELECT id, name FROM stores WHERE user_id = $1 ORDER BY id`, uid)
@@ -705,9 +719,26 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 	desc := strings.TrimSpace(c.PostForm("description"))
 	priceStr := c.PostForm("price")
 	stockStr := c.PostForm("stock")
-	img, err := normalizeProductImageURL(c.PostForm("image_url"))
+
+	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
-		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_image_url")
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
+		return
+	}
+
+	stock, err := strconv.Atoi(stockStr)
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
+		return
+	}
+
+	product, err := normalizeProductCreate(name, desc, price, stock, c.PostForm("image_url"))
+	if err != nil {
+		if err.Error() == "invalid image_url" || err.Error() == "image_url is too long" {
+			c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_image_url")
+			return
+		}
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
 		return
 	}
 
@@ -717,19 +748,9 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 		return
 	}
 
-	var price float64
-	if p, err := strconv.ParseFloat(priceStr, 64); err == nil {
-		price = p
-	}
-
-	var stock int
-	if st, err := strconv.Atoi(stockStr); err == nil {
-		stock = st
-	}
-
 	_, err = s.pool.Exec(c.Request.Context(),
 		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, $6)`,
-		storeID, name, desc, price, stock, img,
+		storeID, product.Name, product.Description, product.Price, product.Stock, product.ImageURL,
 	)
 	if err != nil {
 		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=create_failed")
@@ -766,7 +787,7 @@ func (s *Server) dashboardProductDelete(c *gin.Context) {
 		return
 	}
 
-	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM products WHERE id = $1", productID); err != nil {
+	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM products WHERE id = $1 AND store_id = $2", productID, storeID); err != nil {
 		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=delete_failed")
 		return
 	}
