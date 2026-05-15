@@ -655,6 +655,20 @@ func (s *Server) dashboardProductsGet(c *gin.Context) {
 		ActiveNav:          "products",
 		Title:              "Products",
 	}
+	switch strings.TrimSpace(c.Query("err")) {
+	case "invalid_image_url":
+		data.Error = "Product image URL must be empty or start with http:// or https://."
+	case "invalid_store":
+		data.Error = "Select one of your stores before adding a product."
+	case "create_failed":
+		data.Error = "Product could not be created. Check the product details and try again."
+	case "invalid_product":
+		data.Error = "Invalid product."
+	case "not_found":
+		data.Error = "Product not found."
+	case "delete_failed":
+		data.Error = "Product could not be deleted. Try again."
+	}
 
 	// Fetch stores for the store selector
 	rows, err := s.pool.Query(c.Request.Context(), `SELECT id, name FROM stores WHERE user_id = $1 ORDER BY id`, uid)
@@ -766,7 +780,7 @@ func (s *Server) dashboardProductDelete(c *gin.Context) {
 		return
 	}
 
-	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM products WHERE id = $1", productID); err != nil {
+	if _, err := s.pool.Exec(c.Request.Context(), "DELETE FROM products WHERE id = $1 AND store_id = $2", productID, storeID); err != nil {
 		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=delete_failed")
 		return
 	}
