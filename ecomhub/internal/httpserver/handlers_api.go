@@ -70,6 +70,14 @@ type productUpdateValues struct {
 	ImageURL string
 }
 
+type productCreateValues struct {
+	Name        string
+	Description string
+	Price       float64
+	Stock       int
+	ImageURL    string
+}
+
 type storeThemeBody struct {
 	PrimaryColor string  `json:"primary_color"`
 	AccentColor  string  `json:"accent_color"`
@@ -165,6 +173,30 @@ func normalizeProductUpdate(body productUpdateBody) (productUpdateValues, error)
 		}
 		out.ImageURL = imageURL
 	}
+	return out, nil
+}
+
+func normalizeProductCreate(name string, description string, price float64, stock int, imageURL string) (productCreateValues, error) {
+	out := productCreateValues{
+		Name:        strings.TrimSpace(name),
+		Description: strings.TrimSpace(description),
+		Price:       price,
+		Stock:       stock,
+	}
+	if out.Name == "" {
+		return out, errors.New("product name is required")
+	}
+	if out.Price < 0 {
+		return out, errors.New("price must be greater than or equal to 0")
+	}
+	if out.Stock < 0 {
+		return out, errors.New("stock must be greater than or equal to 0")
+	}
+	normalizedImageURL, err := normalizeProductImageURL(imageURL)
+	if err != nil {
+		return out, err
+	}
+	out.ImageURL = normalizedImageURL
 	return out, nil
 }
 
@@ -626,7 +658,7 @@ func (s *Server) apiCreateProduct(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	imageURL, err := normalizeProductImageURL(body.ImageURL)
+	product, err := normalizeProductCreate(body.Name, body.Description, body.Price, body.Stock, body.ImageURL)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -634,7 +666,7 @@ func (s *Server) apiCreateProduct(c *gin.Context) {
 	var id int64
 	err = s.pool.QueryRow(c.Request.Context(),
 		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, NULLIF($6,'')) RETURNING id`,
-		body.StoreID, strings.TrimSpace(body.Name), strings.TrimSpace(body.Description), body.Price, body.Stock, imageURL,
+		body.StoreID, product.Name, product.Description, product.Price, product.Stock, product.ImageURL,
 	).Scan(&id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create failed"})
@@ -723,7 +755,7 @@ func (s *Server) apiDeleteProduct(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	_, err = s.pool.Exec(c.Request.Context(), `DELETE FROM products WHERE id = $1`, id)
+	_, err = s.pool.Exec(c.Request.Context(), `DELETE FROM products WHERE id = $1 AND store_id = $2`, id, storeID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete failed"})
 		return

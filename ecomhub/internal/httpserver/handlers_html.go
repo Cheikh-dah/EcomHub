@@ -719,9 +719,26 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 	desc := strings.TrimSpace(c.PostForm("description"))
 	priceStr := c.PostForm("price")
 	stockStr := c.PostForm("stock")
-	img, err := normalizeProductImageURL(c.PostForm("image_url"))
+
+	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
-		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_image_url")
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
+		return
+	}
+
+	stock, err := strconv.Atoi(stockStr)
+	if err != nil {
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
+		return
+	}
+
+	product, err := normalizeProductCreate(name, desc, price, stock, c.PostForm("image_url"))
+	if err != nil {
+		if err.Error() == "invalid image_url" || err.Error() == "image_url is too long" {
+			c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_image_url")
+			return
+		}
+		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=invalid_product")
 		return
 	}
 
@@ -731,19 +748,9 @@ func (s *Server) dashboardProductsPost(c *gin.Context) {
 		return
 	}
 
-	var price float64
-	if p, err := strconv.ParseFloat(priceStr, 64); err == nil {
-		price = p
-	}
-
-	var stock int
-	if st, err := strconv.Atoi(stockStr); err == nil {
-		stock = st
-	}
-
 	_, err = s.pool.Exec(c.Request.Context(),
 		`INSERT INTO products (store_id, name, description, price, stock, image_url) VALUES ($1, $2, $3, $4, $5, $6)`,
-		storeID, name, desc, price, stock, img,
+		storeID, product.Name, product.Description, product.Price, product.Stock, product.ImageURL,
 	)
 	if err != nil {
 		c.Redirect(http.StatusSeeOther, "/dashboard/products?err=create_failed")

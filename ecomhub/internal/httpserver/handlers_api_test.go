@@ -50,6 +50,51 @@ func TestNormalizeProductUpdateRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestNormalizeProductCreateRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		product  string
+		price    float64
+		stock    int
+		imageURL string
+	}{
+		{name: "blank name", product: "   ", price: 1, stock: 1},
+		{name: "negative price", product: "Jacket", price: -0.01, stock: 1},
+		{name: "negative stock", product: "Jacket", price: 1, stock: -1},
+		{name: "invalid image url", product: "Jacket", price: 1, stock: 1, imageURL: "data:image/png;base64,abc"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := normalizeProductCreate(tt.product, "desc", tt.price, tt.stock, tt.imageURL); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestNormalizeProductCreateTrimsValidValues(t *testing.T) {
+	product, err := normalizeProductCreate("  Jacket  ", "  Warm  ", 12.5, 3, "  https://example.com/jacket.jpg  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if product.Name != "Jacket" {
+		t.Fatalf("name not normalized: %#v", product)
+	}
+	if product.Description != "Warm" {
+		t.Fatalf("description not normalized: %#v", product)
+	}
+	if product.Price != 12.5 {
+		t.Fatalf("price not normalized: %#v", product)
+	}
+	if product.Stock != 3 {
+		t.Fatalf("stock not normalized: %#v", product)
+	}
+	if product.ImageURL != "https://example.com/jacket.jpg" {
+		t.Fatalf("image URL not normalized: %#v", product)
+	}
+}
+
 func TestNormalizeProductImageURL(t *testing.T) {
 	tests := []struct {
 		name string
