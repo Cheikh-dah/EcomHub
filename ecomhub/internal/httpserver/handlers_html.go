@@ -503,6 +503,8 @@ func (s *Server) dashboardGet(c *gin.Context) {
 	switch strings.TrimSpace(c.Query("err")) {
 	case "invalid_store":
 		data.Error = "Invalid store name or subdomain. Use letters, numbers, and hyphens only; do not start or end with a hyphen (max 63 characters). Subdomains are saved in lowercase."
+	case "reserved_subdomain":
+		data.Error = "That subdomain is reserved for EcomHub. Pick a different subdomain."
 	case "taken":
 		data.Error = "That subdomain is already taken, or the store could not be saved. Pick a different subdomain."
 	}
@@ -547,9 +549,17 @@ func (s *Server) dashboardErr(c *gin.Context, msg string) {
 func (s *Server) dashboardCreateStore(c *gin.Context) {
 	_ = c.Request.ParseForm()
 	name := strings.TrimSpace(c.PostForm("name"))
-	sub := normalizeSubdomain(c.PostForm("subdomain"))
+	sub, subErr := normalizeStoreSubdomain(c.PostForm("subdomain"))
 	desc := strings.TrimSpace(c.PostForm("description"))
-	if name == "" || !subdomainRe.MatchString(sub) {
+	if name == "" {
+		c.Redirect(http.StatusSeeOther, "/dashboard?err=invalid_store")
+		return
+	}
+	if subErr != nil {
+		if errors.Is(subErr, errReservedSubdomain) {
+			c.Redirect(http.StatusSeeOther, "/dashboard?err=reserved_subdomain")
+			return
+		}
 		c.Redirect(http.StatusSeeOther, "/dashboard?err=invalid_store")
 		return
 	}

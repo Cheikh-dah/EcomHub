@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -141,6 +142,47 @@ func TestNormalizeStoreNameTrimsName(t *testing.T) {
 	}
 	if name != "My Store" {
 		t.Fatalf("expected trimmed store name, got %q", name)
+	}
+}
+
+func TestNormalizeStoreSubdomainNormalizesValidSubdomain(t *testing.T) {
+	sub, err := normalizeStoreSubdomain("  My-Store  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sub != "my-store" {
+		t.Fatalf("expected normalized subdomain, got %q", sub)
+	}
+}
+
+func TestNormalizeStoreSubdomainRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+	}{
+		{name: "empty", in: ""},
+		{name: "starts with hyphen", in: "-store"},
+		{name: "ends with hyphen", in: "store-"},
+		{name: "underscore", in: "my_store"},
+		{name: "too long", in: strings.Repeat("a", 64)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := normalizeStoreSubdomain(tt.in); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestNormalizeStoreSubdomainRejectsReservedValues(t *testing.T) {
+	for _, in := range []string{"www", "api", "admin", "dashboard", "app", "  API  "} {
+		t.Run(in, func(t *testing.T) {
+			if _, err := normalizeStoreSubdomain(in); !errors.Is(err, errReservedSubdomain) {
+				t.Fatalf("expected reserved subdomain error, got %v", err)
+			}
+		})
 	}
 }
 
