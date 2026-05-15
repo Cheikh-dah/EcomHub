@@ -130,7 +130,9 @@ Validation:
 - `name` is required.
 - `subdomain` is required.
 - `subdomain` is normalized/lowercased server-side.
+- `subdomain` must use letters, numbers, and hyphens only, and cannot start or end with a hyphen.
 - `subdomain` must be unique.
+- `subdomain` cannot be a reserved platform name: `www`, `api`, `admin`, `dashboard`, `app`.
 
 Response:
 
@@ -140,6 +142,12 @@ Response:
   "subdomain": "my-store"
 }
 ```
+
+Errors:
+
+- `400 Bad Request`: invalid body, invalid subdomain, reserved subdomain, or missing store name.
+- `409 Conflict`: subdomain already taken.
+- `500 Internal Server Error`: create failed.
 
 ### `PUT /api/stores/:id`
 
@@ -160,6 +168,22 @@ Response:
 ```json
 { "ok": true }
 ```
+
+Validation:
+
+- `name` is required.
+- `subdomain` is required.
+- `subdomain` is normalized/lowercased server-side.
+- `subdomain` must use letters, numbers, and hyphens only, and cannot start or end with a hyphen.
+- `subdomain` must be unique.
+- `subdomain` cannot be a reserved platform name: `www`, `api`, `admin`, `dashboard`, `app`.
+
+Errors:
+
+- `400 Bad Request`: invalid body, invalid id, invalid subdomain, or reserved subdomain.
+- `404 Not Found`: store does not exist or is not owned by the caller.
+- `409 Conflict`: subdomain already taken.
+- `500 Internal Server Error`: update failed.
 
 ## Store Theme Endpoints
 
