@@ -24,6 +24,16 @@ var hexColorRe = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 const maxProductImageURLLength = 2048
 
+var errReservedSubdomain = errors.New("reserved subdomain")
+
+var reservedStoreSubdomains = map[string]struct{}{
+	"admin":     {},
+	"api":       {},
+	"app":       {},
+	"dashboard": {},
+	"www":       {},
+}
+
 type storeBody struct {
 	Name        string `json:"name" binding:"required"`
 	Subdomain   string `json:"subdomain" binding:"required"`
@@ -107,6 +117,17 @@ func normalizeStoreName(v string) (string, error) {
 		return "", errors.New("store name is required")
 	}
 	return name, nil
+}
+
+func normalizeStoreSubdomain(v string) (string, error) {
+	sub := normalizeSubdomain(v)
+	if !subdomainRe.MatchString(sub) {
+		return "", errors.New("invalid subdomain")
+	}
+	if _, ok := reservedStoreSubdomains[sub]; ok {
+		return "", errReservedSubdomain
+	}
+	return sub, nil
 }
 
 func normalizeProductUpdate(body productUpdateBody) (productUpdateValues, error) {
@@ -214,9 +235,9 @@ func (s *Server) apiCreateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	sub := normalizeSubdomain(body.Subdomain)
-	if !subdomainRe.MatchString(sub) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subdomain"})
+	sub, err := normalizeStoreSubdomain(body.Subdomain)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	uid, _ := middleware.UserID(c)
@@ -247,9 +268,9 @@ func (s *Server) apiUpdateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	sub := normalizeSubdomain(body.Subdomain)
-	if !subdomainRe.MatchString(sub) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subdomain"})
+	sub, err := normalizeStoreSubdomain(body.Subdomain)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	uid, _ := middleware.UserID(c)
